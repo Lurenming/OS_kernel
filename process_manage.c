@@ -108,6 +108,7 @@ PCB* check_preemption(PCB* process_in_execute) // 检查是否需要抢占，并
     PCB* higher_priority_process = priority_dispatch(); // 找到优先级最高的进程，不存在则返回NULL
     if (higher_priority_process && higher_priority_process->priority < process_in_execute->priority) 
     {
+        // 如果ready中选出的最高优先级比现在执行的优先级还高
         printf("运行时间:%d   PID为 %d ,名称为 %s 的进程被更高优先级进程PID为 %d ,名称为 %s 的进程抢占！\n",timer,
         process_in_execute->pid, process_in_execute->process_name,
         higher_priority_process->pid, higher_priority_process->process_name);
@@ -121,6 +122,9 @@ PCB* check_preemption(PCB* process_in_execute) // 检查是否需要抢占，并
         add_to_queue(p_running_queue, higher_priority_process);
 
         return higher_priority_process; // 返回被抢占的新进程
+    }
+    else{
+        return process_in_execute;
     }
 }
 
@@ -202,7 +206,7 @@ PCB* get_now_process(int sche, int isP){ // 这个函数用于考虑调度算法
                 case 2:
                     //优先级调度算法，在ready队列中，找优先级最高的进程
                     if(now == NULL) priority_dispatch();
-                    return check_preemption(now);
+                    else return check_preemption(now);
                     break;
 
                 case 3:
@@ -239,7 +243,7 @@ void run(){ // 这个函数以时间片为单位，每次经过一个时间片�
         抢占式中，每一个时间片时，都选择一个优先级相对较高的，如果自己和别人优先级相同，则运行自己*/
 
         PCB* process_last = p_running_queue->head; // 上一次运行的进程
-        process_in_execute = get_now_process(2, 1);  // 当前正在运行的进程
+        process_in_execute = get_now_process(scheNum, mode);  // 当前正在运行的进程
         // print_process(process_in_execute);
         if(process_in_execute != NULL && process_last == NULL){ // 上次运行的进程结束了
             remove_from_queue(p_ready_queue, process_in_execute);

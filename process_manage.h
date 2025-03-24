@@ -18,6 +18,7 @@ typedef struct PCB {
 
 int process_count = 0; // CPU中进程总数
 int timer = 0; //计数器，打印程序执行信息
+int scheNum = 0; // 算法序号
 int mode = 0; // mode=0代表非抢占调度算法，=1代表抢占性
 
 typedef struct QUEUE {
