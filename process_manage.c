@@ -93,7 +93,7 @@ PCB* priority_dispatch() //优先级调度算法，返回查找到的优先级�
     PCB *dispatched_process = curr;
     while(curr!=NULL) //遍历查找优先级最高，即数值最低的进程
     {
-        if(curr->priority < tem)
+        if(curr->priority < tem) // 只有当优先级小时，才会切换；优先级相同时，不会切换
         {
             tem = curr->priority;
             dispatched_process=curr;
@@ -103,8 +103,7 @@ PCB* priority_dispatch() //优先级调度算法，返回查找到的优先级�
     return dispatched_process;
 }
 
-// 检查是否需要抢占，并执行抢占逻辑
-PCB* check_preemption(PCB* process_in_execute) 
+PCB* check_preemption(PCB* process_in_execute) // 检查是否需要抢占，并执行抢占逻辑
 {
     PCB* higher_priority_process = priority_dispatch(); // 找到优先级最高的进程，不存在则返回NULL
     if (higher_priority_process && higher_priority_process->priority < process_in_execute->priority) 
@@ -167,15 +166,64 @@ void execute_process()
     }
 }
 
-void run(){
-    // 这个函数以时间片为单位，每次经过一个时间片，就对创建的所有进程进行处理
+PCB* get_now_process(int sche, int isP){ // 这个函数用于考虑调度算法和抢占（非抢占）
+    /*
+    规定：sche = 0 -- FCFS
+        sche = 1 -- SJF
+        sche = 2 -- 优先级
+        sche = 3 -- RR
+        isP = 0 -- 非抢占
+        isP = 1 -- 抢占
+    */
+    PCB* now = p_running_queue->head; // 有可能现在还没有进程在里面
+    PCB* process_in_execute = NULL;
+    if(now != NULL && isP == 0){
+        // 正在运行一个进程，而且非抢占
+        return now;
+    }
+    else{
+        // 没有进程运行，或者抢占，此时需要重新找一个进程
+        if(p_ready_queue->pcb_count == 0){
+            // 此时没有进程可供选择
+            return NULL;
+        }
+        else{
+            // 有可以选择的，使用调度算法
+            switch(sche){
+                case 0:
+                    //FCFS调度算法，比较进入ready队列的时间
+                    return p_ready_queue->head;
+                    break;
+
+                case 1:
+                    //SJF调度算法
+                    break;
+
+                case 2:
+                    //优先级调度算法，在ready队列中，找优先级最高的进程
+                    if(now == NULL) priority_dispatch();
+                    return check_preemption(now);
+                    break;
+
+                case 3:
+                    //轮询调度算法
+                    break;
+            }
+        }
+    }
+
+}
+
+void run(){ // 这个函数以时间片为单位，每次经过一个时间片，就对创建的所有进程进行处理
+    PCB* process_in_execute = NULL;
+    PCB* process_last = NULL;
     timer = 0;
+
     while(1){
         // 先默认死循环
-        PCB* process_in_execute = NULL;
         PCB *curr =start_queue.head;
 
-        printf("运行时间:%d\n", timer);
+        //printf("运行时间:%d\n", timer);
         while(curr != NULL){ // 遍历start队列，将可以放入ready队列的进程放入
             if(timer >= curr ->start_time_slot){
                 remove_from_queue(p_start_queue, curr);
@@ -184,11 +232,36 @@ void run(){
             curr = curr->next;
         }
 
-         
+        // 调度算法：选择一个进程来运行
+        /*详细理解：调度算法包含FCFS、SJF、优先级、RR，还包含抢占式和非抢占式
+        但是这些调度算法都可以化作在每一个时间片结尾进行一次选择
+        详细的来说：非抢占相当于在这个程序结束前，都选择自己；
+        抢占式中，每一个时间片时，都选择一个优先级相对较高的，如果自己和别人优先级相同，则运行自己*/
 
+        PCB* process_last = p_running_queue->head; // 上一次运行的进程
+        process_in_execute = get_now_process(2, 1);  // 当前正在运行的进程
+        // print_process(process_in_execute);
+        if(process_in_execute != NULL && process_last == NULL){ // 上次运行的进程结束了
+            remove_from_queue(p_ready_queue, process_in_execute);
+            add_to_queue(p_running_queue, process_in_execute);
+            printf("运行时间:%d   PID为 %d ,名称为 %s 的进程开始运行\n", timer, process_in_execute->pid,process_in_execute->process_name);
+        }
 
+        Sleep(CPU_TIME_SLOT);  // 执行 1 CPU时间
         timer += CPU_TIME_SLOT;
-        getchar();
+
+        if(process_in_execute != NULL){
+            process_in_execute->process_time_slot--;
+            if(process_in_execute->process_time_slot == 0){
+                // 说明这个进程运行结束了
+                printf("运行时间:%d   PID为 %d ,名称为 %s 的进程运行结束。\n", timer,process_in_execute->pid,
+                    process_in_execute->process_name);  // 进程执行完毕，移除
+                remove_from_queue(p_running_queue, process_in_execute);
+                free(process_in_execute);
+                process_count--;
+            }
+        }
+        
     }
 }
 
@@ -208,23 +281,4 @@ void print_queue(QUEUE* queue){
         print_process(curr);
         curr = curr->next;
     }
-}
-
-int main() 
-{
-    initqueue();
-    PCB* p1=create_process(1, 5, "test1", 1, 2); // pid，优先级，名称，开始时间，运行时间
-    PCB* p2=create_process(2, 4, "test2", 0, 3);
-
-    add_to_queue(p_start_queue,p1);
-    add_to_queue(p_start_queue,p2);
-    //print_queue(p_start_queue);
-    run();
-
-    /*
-    add_to_queue(p_ready_queue,p1);
-    add_to_queue(p_ready_queue,p2);
-
-    execute_process();
-    */
 }
