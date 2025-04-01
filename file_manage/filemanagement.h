@@ -62,7 +62,8 @@ typedef struct OS_FILE {
     iNode* f_iNode;    // 指向对应的iNode
     long f_pos;        // 当前文件指针位置
     int f_mode;        // 打开模式 (RDONLY/WRONLY/RDWR)
-} os_file;
+    int f_inode_num;
+} OS_FILE;
 
 bool disk_format();
 bool disk_init();
@@ -80,3 +81,17 @@ int delete_entry(const char* path);
 int add_dir_entry(int parent_inode, const char* name, int new_inode);
 
 void dir_ls (inode_num);
+
+// 文件句柄操作
+OS_FILE* Open_File(const char* path, int mode);
+int file_write(OS_FILE* f, const char* data, int len);
+int file_read(OS_FILE* f, char* buf, int len);
+void Close_File(OS_FILE* f);
+
+void handle_mkdir(const char* path);
+void handle_touch(const char* path);
+void handle_rm(const char* path);
+void handle_ls(const char* path);
+void handle_write(const char* path, const char* data);
+void handle_read(const char* path);
+void print_help();

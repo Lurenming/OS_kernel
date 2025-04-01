@@ -234,62 +234,116 @@ int get_inode(int inode_num, iNode* inode) {
 //----------------文件操作函数----------------
 // 路径解析函数：从根目录开始，依次解析路径中的各个目录（以'/'分隔），返回目标文件或目录对应的inode编号。
 int resolve_path(const char* path, int* inode_num_out) {
-    char path_copy[PATH_LENGTH];
-    strncpy(path_copy, path, PATH_LENGTH - 1);
-    path_copy[PATH_LENGTH - 1] = '\0';
+    //printf("DEBUG: 解析路径: %s\n", path);
 
-    if (strlen(path_copy) == 0) {
+    // 检查输入参数
+    if (!path || !inode_num_out) {
+        //printf("DEBUG: 无效的输入参数\n");
+        return -1;
+    }
+
+    // 处理根目录情况
+    if (path[0] == '/' && strlen(path) == 1) {
+        //printf("DEBUG: 返回根目录inode 0\n");
         *inode_num_out = 0; // 根目录inode
         return 0;
     }
 
-    char* token = strtok(path_copy, "/");
-    int current_inode_num = 0;
-    iNode current_inode;
-    if (get_inode(current_inode_num, &current_inode) < 0) {
+    char path_copy[PATH_LENGTH];
+    strncpy(path_copy, path, PATH_LENGTH - 1);
+    path_copy[PATH_LENGTH - 1] = '\0';
+
+    // 确保路径以'/'开头
+    if (path_copy[0] != '/') {
+        printf("DEBUG: 无效路径: 必须以'/'开头\n");
         return -1;
     }
 
-    while (token != NULL) {
-        // 跳过空token，例如路径末尾的/
-        if (strlen(token) == 0) {
-            token = strtok(NULL, "/");
+    // 从根目录开始
+    int current_inode_num = 0;
+    iNode current_inode;
+    if (get_inode(current_inode_num, &current_inode) < 0) {
+        printf("DEBUG: 获取根目录inode失败\n");
+        return -1;
+    }
+
+    // 跳过路径开头的'/'
+    char* path_ptr = path_copy + 1;
+
+    // 如果路径为空(只有一个'/')
+    if (*path_ptr == '\0') {
+        *inode_num_out = current_inode_num;
+        return 0;
+    }
+
+    char component[Name_length];
+    char* next_slash;
+
+    // 逐级解析路径
+    while (*path_ptr) {
+        // 提取当前路径组件
+        next_slash = strchr(path_ptr, '/');
+        if (next_slash) {
+            int len = next_slash - path_ptr;
+            if (len >= Name_length) len = Name_length - 1;
+            strncpy(component, path_ptr, len);
+            component[len] = '\0';
+            path_ptr = next_slash + 1;
+        }
+        else {
+            strncpy(component, path_ptr, Name_length - 1);
+            component[Name_length - 1] = '\0';
+            path_ptr += strlen(path_ptr);
+        }
+
+        //printf("DEBUG: 当前解析组件: '%s', 当前inode: %d\n", component, current_inode_num);
+
+        // 跳过空组件
+        if (strlen(component) == 0) {
             continue;
         }
 
+        // 确保当前节点是目录
         if (current_inode.i_mode != 0) {
-            printf("错误：%s 不是目录\n", token);
+            printf("DEBUG: 错误: inode %d 不是目录\n", current_inode_num);
             return -1;
         }
 
+        // 读取目录内容
         directory dir;
         if (!block_read(current_inode.block_address[0], (char*)&dir)) {
+            printf("DEBUG: 无法读取目录内容, inode: %d, 块: %d\n",
+                current_inode_num, current_inode.block_address[0]);
             return -1;
         }
 
+        // 在目录中查找组件
         int found = 0;
         for (int i = 0; i < dir.num_entries; i++) {
-            // 比较名称，限制长度为Name_length
-            if (strncmp(dir.entries[i].name, token, Name_length) == 0) {
+            //printf("DEBUG: 检查条目 %d: '%s'\n", i, dir.entries[i].name);
+            if (strncmp(dir.entries[i].name, component, Name_length) == 0) {
                 current_inode_num = dir.entries[i].inode;
                 found = 1;
+                //printf("DEBUG: 找到匹配! 新inode: %d\n", current_inode_num);
+
+                // 获取新inode信息
+                if (get_inode(current_inode_num, &current_inode) < 0) {
+                    //printf("DEBUG: 无法获取inode %d\n", current_inode_num);
+                    return -1;
+                }
                 break;
             }
         }
 
         if (!found) {
-            printf("错误：路径组件 \"%s\" 未找到\n", token);
+            //printf("DEBUG: 未找到路径组件 '%s'\n", component);
             return -1;
         }
-
-        if (get_inode(current_inode_num, &current_inode) < 0) {
-            return -1;
-        }
-
-        token = strtok(NULL, "/");
     }
 
+    // 成功找到路径对应的inode
     *inode_num_out = current_inode_num;
+    //printf("DEBUG: 成功解析路径 '%s' 到inode %d\n", path, current_inode_num);
     return 0;
 }
 
@@ -327,9 +381,12 @@ int add_dir_entry(int parent_inode, const char* name, int new_inode) {
 }
 
 int create_entry(const char* path, int is_dir, int permission) {
+    //printf("DEBUG: 开始创建条目: %s, 类型: %s, 权限: %o\n", 
+           //path, is_dir ? "目录" : "文件", permission);
+
     // 路径有效性检查
     if (strlen(path) == 0 || path[0] != '/') {
-        printf("无效路径: %s\n", path);
+        //printf("DEBUG: 无效路径: %s (必须以'/'开头且不为空)\n", path);
         return -1;
     }
 
@@ -340,39 +397,61 @@ int create_entry(const char* path, int is_dir, int permission) {
 
     // 处理根目录特殊情况
     if (last_slash == path && strlen(path) == 1) {
-        printf("不能创建根目录\n");
+        printf("DEBUG: 不能创建根目录\n");
         return -1;
     }
 
-    // 提取父目录路径（关键修正点）
+    // 提取父目录路径
     if (last_slash != path) {  // 非根目录下的情况
         strncpy(parent_path, path, last_slash - path);
         parent_path[last_slash - path] = '\0';
+        //printf("DEBUG: 父目录路径: %s\n", parent_path);
     }
     else {  // 根目录直接创建条目
         strcpy(parent_path, "/");
+        //printf("DEBUG: 父目录路径: / (根目录)\n");
     }
 
     // 提取文件名并保证终止符
     strncpy(name, last_slash + 1, Name_length - 1);
     name[Name_length - 1] = '\0';
+    //printf("DEBUG: 条目名称: %s\n", name);
 
-    // 获取父目录inode（带错误处理）
+    // 获取父目录inode
     int parent_inode;
+    //printf("DEBUG: 解析父目录路径: %s\n", parent_path);
     if (resolve_path(parent_path, &parent_inode) != 0) {
-        printf("父目录不存在: %s\n", parent_path);
+        //printf("DEBUG: 父目录不存在: %s\n", parent_path);
+        return -1;
+    }
+    //printf("DEBUG: 父目录inode: %d\n", parent_inode);
+
+    // 读取父目录inode和目录内容
+    iNode parent_node;
+    directory parent_dir;
+
+    if (get_inode(parent_inode, &parent_node) != 0) {
+        //printf("DEBUG: 无法读取父目录inode\n");
+        return -1;
+    }
+    //printf("DEBUG: 父目录模式: %d, 大小: %d\n", parent_node.i_mode, parent_node.i_size);
+
+    if (parent_node.i_mode != 0) {
+        printf("DEBUG: 父路径不是目录\n");
         return -1;
     }
 
-    // 检查文件名是否已存在
-    iNode parent_node;
-    directory parent_dir;
-    get_inode(parent_inode, &parent_node);
-    block_read(parent_node.block_address[0], (char*)&parent_dir);
+    if (!block_read(parent_node.block_address[0], (char*)&parent_dir)) {
+        printf("DEBUG: 无法读取父目录内容, 块地址: %d\n", parent_node.block_address[0]);
+        return -1;
+    }
+    //printf("DEBUG: 父目录条目数: %d/%d\n", parent_dir.num_entries, DIR_NUM);
 
+    // 检查文件名是否已存在
     for (int i = 0; i < parent_dir.num_entries; i++) {
+        //printf("DEBUG: 检查条目 %d: %s\n", i, parent_dir.entries[i].name);
         if (strncmp(parent_dir.entries[i].name, name, Name_length) == 0) {
-            printf("名称冲突: %s\n", name);
+            printf("DEBUG: 名称冲突: %s\n", name);
             return -1;
         }
     }
@@ -380,44 +459,111 @@ int create_entry(const char* path, int is_dir, int permission) {
     // 分配新inode
     int new_inode = find_free_inode();
     if (new_inode == -1) {
-        printf("iNode耗尽\n");
+        printf("DEBUG: iNode耗尽\n");
         return -1;
     }
+    //printf("DEBUG: 分配的新inode: %d\n", new_inode);
 
     // 初始化inode结构
     iNode new_node = {
         .i_mode = is_dir ? 0 : 1,
+        .i_size = 0,  // 初始大小为0
         .permission = permission,
         .ctime = time(NULL),
         .mtime = time(NULL),
-        .nlinks = 1
+        .nlinks = 1,
+        .open_num = 0
     };
+
+    // 清空块地址数组
+    memset(new_node.block_address, 0, sizeof(new_node.block_address));
 
     // 处理目录类型初始化
     if (is_dir) {
         int new_block = alloc_first_free_block();
-        if (new_block == -1) return -1;
+        if (new_block == -1) {
+            printf("DEBUG: 无法分配数据块\n");
+            return -1;
+        }
+        //printf("DEBUG: 为目录分配的数据块: %d\n", new_block);
 
         // 初始化空目录
         directory new_dir = { 0 }; // 条目数设为0
-        block_write(new_block, (char*)&new_dir);
+        if (!block_write(new_block, (char*)&new_dir)) {
+            printf("DEBUG: 写入新目录数据失败\n");
+            free_allocated_block(new_block);
+            return -1;
+        }
 
         new_node.i_size = sizeof(directory);
         new_node.block_address[0] = new_block;
-        new_node.nlinks = 1; // 目录自引用
     }
 
     // 写入inode表
     FILE* fp = fopen(DEV_NAME, "r+b");
+    if (!fp) {
+        //printf("DEBUG: 无法打开磁盘文件用于写入inode\n");
+        if (is_dir && new_node.block_address[0] != 0) {
+            free_allocated_block(new_node.block_address[0]);
+        }
+        return -1;
+    }
+
     fseek(fp, INODE_START * BLOCK_SIZE + new_inode * sizeof(iNode), SEEK_SET);
     fwrite(&new_node, sizeof(iNode), 1, fp);
     fclose(fp);
+    //printf("DEBUG: 写入新inode %d 到磁盘\n", new_inode);
 
-    // 更新父目录（带容量检查）
-    if (add_dir_entry(parent_inode, name, new_inode) != 0) {
-        printf("无法添加目录项\n");
+    // 更新父目录
+    if (parent_dir.num_entries >= DIR_NUM) {
+        printf("DEBUG: 父目录已满 (最大条目数: %d)\n", DIR_NUM);
+        if (is_dir && new_node.block_address[0] != 0) {
+            free_allocated_block(new_node.block_address[0]);
+        }
+        // 释放inode (将nlinks设为0)
+        new_node.nlinks = 0;
+        fp = fopen(DEV_NAME, "r+b");
+        if (fp) {
+            fseek(fp, INODE_START * BLOCK_SIZE + new_inode * sizeof(iNode), SEEK_SET);
+            fwrite(&new_node, sizeof(iNode), 1, fp);
+            fclose(fp);
+        }
         return -1;
     }
+
+    // 添加新条目到父目录
+    strncpy(parent_dir.entries[parent_dir.num_entries].name, name, Name_length - 1);
+    parent_dir.entries[parent_dir.num_entries].name[Name_length - 1] = '\0';
+    parent_dir.entries[parent_dir.num_entries].inode = new_inode;
+    parent_dir.num_entries++;
+
+    // 写回父目录数据
+    if (!block_write(parent_node.block_address[0], (char*)&parent_dir)) {
+        //printf("DEBUG: 无法更新父目录数据\n");
+        if (is_dir && new_node.block_address[0] != 0) {
+            free_allocated_block(new_node.block_address[0]);
+        }
+        // 释放inode
+        new_node.nlinks = 0;
+        fp = fopen(DEV_NAME, "r+b");
+        if (fp) {
+            fseek(fp, INODE_START * BLOCK_SIZE + new_inode * sizeof(iNode), SEEK_SET);
+            fwrite(&new_node, sizeof(iNode), 1, fp);
+            fclose(fp);
+        }
+        return -1;
+    }
+    //printf("DEBUG: 更新父目录，添加条目: %s -> inode %d\n", name, new_inode);
+
+    // 更新父目录元数据
+    parent_node.mtime = time(NULL);
+    fp = fopen(DEV_NAME, "r+b");
+    if (fp) {
+        fseek(fp, INODE_START * BLOCK_SIZE + parent_inode * sizeof(iNode), SEEK_SET);
+        fwrite(&parent_node, sizeof(iNode), 1, fp);
+        fclose(fp);
+    }
+    //printf("DEBUG: 条目创建成功: %s, inode: %d\n", path, new_inode);
 
     return new_inode;
 }
@@ -554,70 +700,265 @@ void dir_ls(int inode_num) {
     }
     printf("==========================\n\n");
 }
-//----------------测试用例----------------
-int main() {
-    // 初始化文件系统
-    disk_format();
-    disk_init();
 
-    // 创建测试结构
-    create_entry("/docs", 1, 0755);         // 有效目录
-    create_entry("/images", 1, 0755);       // 有效目录
-    create_entry("/readme.txt", 0, 0644);    // 文件
-    create_entry("/docs/report.doc", 0, 0644); // 嵌套文件
+// 打开文件，返回文件句柄
+OS_FILE* Open_File(const char* path, int mode) {
+    int inode_num;
+    printf("尝试打开文件: %s\n", path);
 
-    // 触发错误测试
-    create_entry("/", 1, 0755);             // 错误：创建根目录
-    create_entry("/docs", 1, 0755);         // 错误：重复创建
-    create_entry("/invalid/path", 1, 0755); // 错误：无效路径
+    if (resolve_path(path, &inode_num) != 0) {
+        printf("文件不存在: %s\n", path);
+        return NULL;
+    }
 
-    // 显示结构
-    int root_inode;
-    resolve_path("/", &root_inode);
-    dir_ls(root_inode);
+    printf("文件inode编号: %d\n", inode_num);
 
-    int docs_inode;
-    resolve_path("/docs", &docs_inode);
-    dir_ls(docs_inode);
+    // 分配文件句柄内存
+    OS_FILE* file = (OS_FILE*)malloc(sizeof(OS_FILE));
+    if (!file) {
+        perror("内存分配失败");
+        return NULL;
+    }
 
-    delete_entry("/readme.txt") == 0 ?
-        printf("文件删除成功\n") : printf("文件删除失败\n");
+    // 初始化为零，避免潜在问题
+    memset(file, 0, sizeof(OS_FILE));
 
-    // 删除空目录
-    delete_entry("/images") == 0 ?
-        printf("空目录删除成功\n") : printf("空目录删除失败\n");
+    // 分配iNode内存并读取iNode
+    file->f_iNode = (iNode*)malloc(sizeof(iNode));
+    file->f_inode_num = inode_num;
+    if (!file->f_iNode) {
+        perror("内存分配失败");
+        free(file);
+        return NULL;
+    }
 
-    // 尝试删除非空目录
-    delete_entry("/docs") == 0 ?
-        printf("非空目录删除成功\n") : printf("非空目录删除失败（预期失败）\n");
+    // 初始化为零
+    memset(file->f_iNode, 0, sizeof(iNode));
 
-    // 验证删除结果
-    printf("\n----- 删除后结构 -----");
-    int root;
-    resolve_path("/", &root);
-    dir_ls(root);
+    if (get_inode(inode_num, file->f_iNode) < 0) {
+        printf("无法读取iNode %d\n", inode_num);
+        free(file->f_iNode);
+        free(file);
+        return NULL;
+    }
+    file->f_pos = 0;  // 初始位置
+    file->f_mode = mode;
 
-    // 创建测试文件
-    create_entry("/test.txt", 0, RDWR); // 创建普通文件
+    // 增加打开数量
+    file->f_iNode->open_num++;
 
-    // 写入文件
-    os_file* f = Open_File("/test.txt", RDWR);
-    const char* data = "Hello, File System!";
-    int written = file_write(f, data, strlen(data));
-    printf("写入 %d 字节\n", written);
+    // 将更新后的iNode写回磁盘
+    FILE* fp = fopen(DEV_NAME, "r+b");
+    if (fp) {
+        fseek(fp, INODE_START * BLOCK_SIZE + inode_num * sizeof(iNode), SEEK_SET);
+        fwrite(file->f_iNode, sizeof(iNode), 1, fp);
+        fclose(fp);
+    }
+    else {
+        perror("无法更新inode信息");
+        // 继续执行，不返回错误
+    }
 
-    // 重置读取位置
-    f->f_pos = 0;
-
-    // 读取文件
-    char buf[128] = { 0 };
-    int read = file_read(f, buf, sizeof(buf));
-    printf("读取内容：%.*s\n", read, buf);
-
-    Close_File(f);
-    return 0;
+    printf("文件成功打开\n");
+    return file;
 }
 
+// 写入文件数据
+int file_write(OS_FILE* f, const char* data, int len) {
+    if (!f || !f->f_iNode) {
+        printf("无效的文件句柄\n");
+        return -1;
+    }
 
+    // 检查写权限
+    //if (!(f->f_mode & WRONLY) && !(f->f_mode & RDWR)) {
+    //    printf("无写入权限\n");
+    //    return -1;
+    //}
 
+    // 检查是否为目录
+    if (f->f_iNode->i_mode == 0) {
+        printf("不能对目录进行写操作\n");
+        return -1;
+    }
 
+    // 计算需要写入的总长度
+    int total_size = f->f_pos + len;
+    if (total_size > MAX_FILE_SIZE) {
+        printf("超出最大文件大小\n");
+        return -1;
+    }
+
+    // 计算需要的块数
+    int current_blocks = (f->f_iNode->i_size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    int needed_blocks = (total_size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+
+    // 如果需要分配更多块
+    for (int i = current_blocks; i < needed_blocks && i < FBLK_NUM; i++) {
+        int new_block = alloc_first_free_block();
+        if (new_block == -1) {
+            printf("磁盘空间不足\n");
+            return -1;
+        }
+        f->f_iNode->block_address[i] = new_block;
+    }
+
+    // 实际写入数据
+    int bytes_written = 0;
+    int remaining = len;
+
+    while (remaining > 0 && bytes_written < len) {
+        // 计算当前块和块内偏移
+        int current_block_index = f->f_pos / BLOCK_SIZE;
+        int offset_in_block = f->f_pos % BLOCK_SIZE;
+
+        // 检查块索引是否有效
+        if (current_block_index >= FBLK_NUM) {
+            break;
+        }
+
+        // 获取块地址
+        int block_address = f->f_iNode->block_address[current_block_index];
+        if (block_address == 0) {
+            // 分配新块
+            block_address = alloc_first_free_block();
+            if (block_address == -1) {
+                break;
+            }
+            f->f_iNode->block_address[current_block_index] = block_address;
+        }
+
+        // 读取当前块
+        char block_data[BLOCK_SIZE] = { 0 };
+        block_read(block_address, block_data);
+
+        // 计算本次写入大小
+        int bytes_to_write = BLOCK_SIZE - offset_in_block;
+        if (bytes_to_write > remaining) {
+            bytes_to_write = remaining;
+        }
+
+        // 复制数据到块
+        memcpy(block_data + offset_in_block, data + bytes_written, bytes_to_write);
+
+        // 写回块
+        block_write(block_address, block_data);
+
+        // 更新计数
+        bytes_written += bytes_to_write;
+        remaining -= bytes_to_write;
+        f->f_pos += bytes_to_write;
+    }
+
+    // 更新文件大小
+    if (f->f_pos > f->f_iNode->i_size) {
+        f->f_iNode->i_size = f->f_pos;
+    }
+
+    // 更新修改时间
+    f->f_iNode->mtime = time(NULL);
+
+    // 将更新后的iNode写回磁盘
+    FILE* fp = fopen(DEV_NAME, "r+b");
+    if (fp) {
+        fseek(fp, INODE_START * BLOCK_SIZE + f->f_inode_num * sizeof(iNode), SEEK_SET);
+        fwrite(f->f_iNode, sizeof(iNode), 1, fp);
+        fclose(fp);
+    }
+
+    return bytes_written;
+}
+
+// 读取文件数据
+int file_read(OS_FILE* f, char* buf, int len) {
+    if (!f || !f->f_iNode) {
+        printf("无效的文件句柄\n");
+        return -1;
+    }
+
+    // 检查读权限
+    //if (!(f->f_mode & RDONLY) && !(f->f_mode & RDWR)) {
+    //  printf("无读取权限\n");
+    //  return -1;
+    //}
+
+    // 检查是否为目录
+    if (f->f_iNode->i_mode == 0) {
+        printf("不能对目录进行读操作\n");
+        return -1;
+    }
+
+    // 调整读取长度，确保不超过文件末尾
+    if (f->f_pos >= f->f_iNode->i_size) {
+        return 0;  // 已到达文件末尾
+    }
+
+    if (f->f_pos + len > f->f_iNode->i_size) {
+        len = f->f_iNode->i_size - f->f_pos;
+    }
+
+    int bytes_read = 0;
+    int remaining = len;
+
+    // 按块读取数据
+    while (remaining > 0 && bytes_read < len) {
+        // 计算当前块和块内偏移
+        int current_block_index = f->f_pos / BLOCK_SIZE;
+        int offset_in_block = f->f_pos % BLOCK_SIZE;
+
+        // 检查块索引是否有效
+        if (current_block_index >= FBLK_NUM) {
+            break;
+        }
+
+        // 获取块地址
+        int block_address = f->f_iNode->block_address[current_block_index];
+        if (block_address == 0) {
+            break;  // 没有分配的块
+        }
+
+        // 读取当前块
+        char block_data[BLOCK_SIZE] = { 0 };
+        block_read(block_address, block_data);
+
+        // 计算本次读取大小
+        int bytes_to_read = BLOCK_SIZE - offset_in_block;
+        if (bytes_to_read > remaining) {
+            bytes_to_read = remaining;
+        }
+
+        // 复制数据到用户缓冲区
+        memcpy(buf + bytes_read, block_data + offset_in_block, bytes_to_read);
+
+        // 更新计数
+        bytes_read += bytes_to_read;
+        remaining -= bytes_to_read;
+        f->f_pos += bytes_to_read;
+    }
+
+    return bytes_read;
+}
+
+// 关闭文件
+void Close_File(OS_FILE* f) {
+    if (!f || !f->f_iNode) {
+        return;
+    }
+
+    // 减少打开数量
+    f->f_iNode->open_num--;
+
+    // 将更新后的iNode写回磁盘
+    FILE* fp = fopen(DEV_NAME, "r+b");
+    if (fp) {
+        fseek(fp, INODE_START * BLOCK_SIZE + f->f_inode_num * sizeof(iNode), SEEK_SET);
+        fwrite(f->f_iNode, sizeof(iNode), 1, fp);
+        fclose(fp);
+    }
+
+    // 释放资源
+    free(f->f_iNode);
+    free(f);
+}
+
+//----------------测试函数----------------
