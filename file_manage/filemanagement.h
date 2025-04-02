@@ -37,9 +37,9 @@ typedef struct super_block {
 typedef struct INODE {
     int i_mode;               // 文件类型：0目录，1普通文件
     int i_size;               // 文件大小（字节数）
-    int permission;           // 文件的读、写、执行权限
-    int ctime;                // 文件的时间戳（暂未处理）
-    int mtime;                // 文件的时间戳（暂未处理）
+    //int permission;           // 文件的读、写、执行权限
+    //int ctime;                // 文件的时间戳（暂未处理）
+    //int mtime;                // 文件的时间戳（暂未处理）
     int nlinks;               // 链接数（有多少目录项指向该inode）
     int block_address[FBLK_NUM]; // 文件数据块的地址数组
     int open_num;             // 打开计数，0表示未打开，1表示已打开
@@ -67,7 +67,6 @@ typedef struct OS_FILE {
 
 bool disk_format();
 bool disk_init();
-bool disk_activate();
 bool block_write(long block, char* buf);
 bool block_read(long block, char* buf);
 int alloc_first_free_block();
@@ -78,8 +77,6 @@ int find_free_inode();//找到一个空闲inode
 int resolve_path(const char* path, int* inode_num_out);
 int create_entry(const char* path, int is_dir, int permission);
 int delete_entry(const char* path);
-int add_dir_entry(int parent_inode, const char* name, int new_inode);
-
 void dir_ls (inode_num);
 
 // 文件句柄操作
@@ -88,6 +85,7 @@ int file_write(OS_FILE* f, const char* data, int len);
 int file_read(OS_FILE* f, char* buf, int len);
 void Close_File(OS_FILE* f);
 
+// 交互函数
 void handle_mkdir(const char* path);
 void handle_touch(const char* path);
 void handle_rm(const char* path);

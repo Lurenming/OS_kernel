@@ -48,32 +48,16 @@ bool disk_init() {
 
     // 初始化根目录
     directory root_dir = { 0 };
-    iNode root_inode = { 0, sizeof(directory), 0777, time(NULL), time(NULL), 2, {DATA_START}, 0 };
+    iNode root_inode = { 0, sizeof(directory), 2, {DATA_START}, 0 };
 
-    fseek(fp, INODE_START * BLOCK_SIZE, SEEK_SET);
+    fseek(fp, INODE_START * BLOCK_SIZE, SEEK_SET);//根节点信息写回inode0
     fwrite(&root_inode, sizeof(iNode), 1, fp);
 
-    fseek(fp, DATA_START * BLOCK_SIZE, SEEK_SET);
+    fseek(fp, DATA_START * BLOCK_SIZE, SEEK_SET);//根目录信息写入数据块
     fwrite(&root_dir, sizeof(directory), 1, fp);
 
     fclose(fp);
     printf("根目录已初始化\n");
-    return true;
-}
-
-// 启动磁盘：加载超级块信息
-bool disk_activate() {
-    FILE* fp = fopen(DEV_NAME, "rb");
-    if (!fp) {
-        perror("磁盘启动失败");
-        return false;
-    }
-
-    super_block sb;
-    fseek(fp, 0, SEEK_SET);
-    fread(&sb, sizeof(super_block), 1, fp);
-
-    fclose(fp);
     return true;
 }
 
@@ -135,7 +119,7 @@ int alloc_first_free_block() {
     }
 
     fseek(fp, BITMAP_START * BLOCK_SIZE, SEEK_SET);
-    fread(bitmap, sizeof(char), MAX_BLOCK, fp);
+    fread(bitmap, sizeof(char), MAX_BLOCK, fp);//从磁盘中读出bitmap
 
     for (int i = 0; i < MAX_BLOCK; i++) {
         if (bitmap[i] == 0) { // 找到空闲块
@@ -232,6 +216,7 @@ int get_inode(int inode_num, iNode* inode) {
 }
 
 //----------------文件操作函数----------------
+
 // 路径解析函数：从根目录开始，依次解析路径中的各个目录（以'/'分隔），返回目标文件或目录对应的inode编号。
 int resolve_path(const char* path, int* inode_num_out) {
     //printf("DEBUG: 解析路径: %s\n", path);
@@ -282,12 +267,12 @@ int resolve_path(const char* path, int* inode_num_out) {
     // 逐级解析路径
     while (*path_ptr) {
         // 提取当前路径组件
-        next_slash = strchr(path_ptr, '/');
+        next_slash = strchr(path_ptr, '/');//查找下个'/'
         if (next_slash) {
             int len = next_slash - path_ptr;
             if (len >= Name_length) len = Name_length - 1;
             strncpy(component, path_ptr, len);
-            component[len] = '\0';
+            component[len] = '\0';//找到目录名称
             path_ptr = next_slash + 1;
         }
         else {
@@ -344,39 +329,6 @@ int resolve_path(const char* path, int* inode_num_out) {
     // 成功找到路径对应的inode
     *inode_num_out = current_inode_num;
     //printf("DEBUG: 成功解析路径 '%s' 到inode %d\n", path, current_inode_num);
-    return 0;
-}
-
-int add_dir_entry(int parent_inode, const char* name, int new_inode) {
-    iNode parent_node;
-    directory dir;
-
-    // 读取父目录数据
-    get_inode(parent_inode, &parent_node);
-    block_read(parent_node.block_address[0], (char*)&dir);
-
-    // 严格容量检查
-    if (dir.num_entries >= DIR_NUM) {
-        printf("错误：目录已满（最大容量 %d）\n", DIR_NUM);
-        return -1;
-    }
-
-    // 添加新条目
-    strncpy(dir.entries[dir.num_entries].name, name, Name_length - 1);
-    dir.entries[dir.num_entries].name[Name_length - 1] = '\0';
-    dir.entries[dir.num_entries].inode = new_inode;
-    dir.num_entries++;
-
-    // 写回磁盘
-    block_write(parent_node.block_address[0], (char*)&dir);
-
-    // 更新父目录元数据
-    parent_node.mtime = time(NULL);
-    FILE* fp = fopen(DEV_NAME, "r+b");
-    fseek(fp, INODE_START * BLOCK_SIZE + parent_inode * sizeof(iNode), SEEK_SET);
-    fwrite(&parent_node, sizeof(iNode), 1, fp);
-    fclose(fp);
-
     return 0;
 }
 
@@ -468,9 +420,9 @@ int create_entry(const char* path, int is_dir, int permission) {
     iNode new_node = {
         .i_mode = is_dir ? 0 : 1,
         .i_size = 0,  // 初始大小为0
-        .permission = permission,
-        .ctime = time(NULL),
-        .mtime = time(NULL),
+        //.permission = permission,
+        //.ctime = time(NULL),
+        //.mtime = time(NULL),
         .nlinks = 1,
         .open_num = 0
     };
@@ -556,7 +508,7 @@ int create_entry(const char* path, int is_dir, int permission) {
     //printf("DEBUG: 更新父目录，添加条目: %s -> inode %d\n", name, new_inode);
 
     // 更新父目录元数据
-    parent_node.mtime = time(NULL);
+    //parent_node.mtime = time(NULL);
     fp = fopen(DEV_NAME, "r+b");
     if (fp) {
         fseek(fp, INODE_START * BLOCK_SIZE + parent_inode * sizeof(iNode), SEEK_SET);
@@ -665,7 +617,7 @@ int delete_entry(const char* path) {
     block_write(parent_inode.block_address[0], (char*)&parent_dir);
 
     // 更新父目录的mtime
-    parent_inode.mtime = time(NULL);
+    //parent_inode.mtime = time(NULL);
     fp = fopen(DEV_NAME, "r+b");
     fseek(fp, INODE_START * BLOCK_SIZE + parent_inode_num * sizeof(iNode), SEEK_SET);
     fwrite(&parent_inode, sizeof(iNode), 1, fp);
@@ -704,14 +656,14 @@ void dir_ls(int inode_num) {
 // 打开文件，返回文件句柄
 OS_FILE* Open_File(const char* path, int mode) {
     int inode_num;
-    printf("尝试打开文件: %s\n", path);
+    //printf("尝试打开文件: %s\n", path);
 
     if (resolve_path(path, &inode_num) != 0) {
         printf("文件不存在: %s\n", path);
         return NULL;
     }
 
-    printf("文件inode编号: %d\n", inode_num);
+    //printf("文件inode编号: %d\n", inode_num);
 
     // 分配文件句柄内存
     OS_FILE* file = (OS_FILE*)malloc(sizeof(OS_FILE));
@@ -759,7 +711,7 @@ OS_FILE* Open_File(const char* path, int mode) {
         // 继续执行，不返回错误
     }
 
-    printf("文件成功打开\n");
+    //printf("文件成功打开\n");
     return file;
 }
 
@@ -856,7 +808,7 @@ int file_write(OS_FILE* f, const char* data, int len) {
     }
 
     // 更新修改时间
-    f->f_iNode->mtime = time(NULL);
+    //f->f_iNode->mtime = time(NULL);
 
     // 将更新后的iNode写回磁盘
     FILE* fp = fopen(DEV_NAME, "r+b");
@@ -960,5 +912,3 @@ void Close_File(OS_FILE* f) {
     free(f->f_iNode);
     free(f);
 }
-
-//----------------测试函数----------------
