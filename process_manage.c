@@ -14,9 +14,17 @@ void initqueue()  //将三个队列初始化，给队列名称赋相应的值
     running_queue.head = running_queue.tail = NULL;
     running_queue.pcb_count = 0;
     
-    strcpy(blocked_queue.queue_name, "blocked");
-    blocked_queue.head = blocked_queue.tail = NULL;
-    blocked_queue.pcb_count = 0;
+    strcpy(blocked_queue[0].queue_name, "lock_blocked");
+    blocked_queue[0].head = blocked_queue[0].tail = NULL;
+    blocked_queue[0].pcb_count = 0;
+
+    strcpy(blocked_queue[1].queue_name, "io_blocked");
+    blocked_queue[1].head = blocked_queue[1].tail = NULL;
+    blocked_queue[1].pcb_count = 0;
+
+    strcpy(blocked_queue[2].queue_name, "memory_blocked");
+    blocked_queue[2].head = blocked_queue[1].tail = NULL;
+    blocked_queue[2].pcb_count = 0;
 }
 
 PCB* create_process(int pid, int priority, char process_name[10], int start_time_slot, int time_slot) //创建进程的函数,将进程初始状态赋值为NULL
@@ -264,6 +272,142 @@ PCB* get_now_process(int sche, int isP){ // 这个函数用于考虑调度算法
             }
         }
     }
+}
+
+void add_to_lock_list(LOCK* newlock, LOCK_POOL *tempool) //将某个锁添加到tempool中(lock_in_use或lock_buffer)
+{
+    if(tempool->lock_count == 0) //锁池为空,将首个锁赋对应的值
+        tempool->lock_list = newlock;
+    else //否则遍历到锁池末尾，添加锁
+    {
+        LOCK* lock_list = tempool->lock_list;
+        while(lock_list->next != NULL)
+            lock_list = lock_list->next;
+        lock_list->next = newlock;
+    }
+    tempool->lock_count++;
+    if(tempool == p_lock_buffer) //如果是lock_buffer，则打印信息
+        printf("运行时间:%d   PID为 %d 的进程请求锁，锁模式为 %c,文件地址为 %s\n",timer,newlock->pid,newlock->lockmode,newlock->file_addr);
+    else //如果是lock_in_use
+        printf("运行时间:%d   PID为 %d 的进程获得锁，锁模式为 %c,文件地址为 %s\n",timer,newlock->pid,newlock->lockmode,newlock->file_addr);
+}
+
+LOCK* remove_from_lock_list(PCB* process,char lockmode,char file_addr[],LOCK_POOL *tempool) //将某个锁从lock_buffer或lock_in_use中移除
+{
+    LOCK *prev=NULL;
+    LOCK *temlock=tempool->lock_list;
+    int count=tempool->lock_count;
+    for(int i=0 ; i< count;i++)
+    {
+        if(temlock->pid==process->pid && temlock->lockmode==lockmode && strcmp(temlock->file_addr,file_addr)==0)
+        {
+            if(i==0) //是锁池中第一个元素
+                tempool->lock_list = tempool->lock_list->next;
+            else if(i==count-1) //是最后一个元素
+                prev->next=NULL;
+            else //是中间元素
+                prev->next=temlock->next;
+            temlock->next=NULL;
+            tempool->lock_count--;
+            return temlock; //返回被移除的锁
+        }
+        prev=temlock;
+        temlock=temlock->next;
+    }
+    return NULL; //没有找到该锁，返回NULL
+}
+
+void enter_critical_section(PCB* process,char lockmode,char file_addr[])  //lockmode 代表进程的对共享文件的操作模式，分为w(写)和r(读)
+{
+    LOCK *newlock = (LOCK *)malloc(sizeof(LOCK)); //根据传入参数创建一个新的锁
+    newlock->next = NULL;
+    newlock->lockmode = lockmode;
+    newlock->pid = process->pid;
+    strcpy(newlock->file_addr,file_addr);
+    add_to_lock_list(newlock,p_lock_buffer); //将新创建的锁添加到lock_buffer中
+    int i=0;
+    int count=lock_in_use.lock_count;
+    LOCK* lock_list = lock_in_use.lock_list;
+    for(; i< count; i++) //遍历lock_in_use，查找是否有进程占有该文件的锁
+    {
+        if(strcmp(lock_list->file_addr,file_addr) == 0) //该文件已经有进程占有锁
+        {
+            if(lock_list->pid == process->pid) 
+            //在lock_in_use中占有该锁的是该进程，采用的策略是。否则
+            {   
+                if(lock_list->lockmode!=lockmode) //如果锁模式不同，使进程离开共享区，申请新锁
+                    leave_critical_section(process,lock_list->lockmode,file_addr); //将该进程从共享区中移除
+                else
+                    return; //如果锁模式不变，则直接返回
+            }
+            else //占有该锁的不是该进程,而是其他进程。则根据lockmode的不同，进行不同的操作
+            {
+                if(lock_list->lockmode == 'w') // 其他进程以写模式占有锁
+                {   
+                    remove_from_queue(p_running_queue, process); //
+                    add_to_queue(p_blocked_queue0, process); //将该进程从运行队列中移除,添加到阻塞队列中
+                    return;
+                }
+                else // 其他进程进程以读模式占有锁
+                {
+                    if (lockmode== 'r') //如果该进程也是要求读，那么可以获得锁
+                    {
+                        remove_from_lock_list(process,lock_list->lockmode,file_addr,p_lock_buffer);
+                        add_to_lock_list(newlock,p_lock_in_use); //将锁从lock_buffer中移除，添加到lock_in_use中
+                    }
+                    else // 该进程要求写，那么不允许共享锁，阻塞该进程
+                    {
+                        remove_from_queue(p_running_queue, process); //将该进程从就绪队列中移除
+                        add_to_queue(p_blocked_queue0, process); //将该进程添加到阻塞队列中
+                        return;
+                    }
+                }   
+            }
+            break;
+        }
+        lock_list = lock_list->next;
+    }
+    if(i == count) //遍历结束，没有任何进程占有锁,则该进程直接获得锁
+    {
+        remove_from_lock_list(process,lockmode,file_addr,p_lock_buffer);
+        add_to_lock_list(newlock,p_lock_in_use); //将锁从lock_buffer中移除，添加到lock_in_use
+    }
+}
+
+void check_blocked_process_lock() //检查阻塞队列中的进程，查看是否有进程可以解除阻塞
+{
+    PCB* curr = blocked_queue[0].head;
+    int i;
+    while(curr != NULL) //遍历阻塞队列
+    {
+        LOCK* lock_list = lock_in_use.lock_list;
+        int count=lock_in_use.lock_count;
+        //该过程存在两个遍历，一个是遍历阻塞队列，一个是遍历锁池，
+        //先遍历锁池，再使阻塞队列指针后移，查看下一个进程是否可以解除阻塞
+        //解除阻塞只有一种情况：如果锁池中没有该文件的锁，则可以解除阻塞
+        for(i =0 ; i< count; i++) 
+        {
+            if(strcmp(lock_list->file_addr,curr->process_name) == 0) //该文件还有进程占有锁，则不能解除阻塞
+                break;
+            lock_list = lock_list->next;
+        }
+        if(i == count) //遍历结束，没有任何进程占有锁,则可以解除阻塞
+        {
+            remove_from_queue(p_blocked_queue0, curr); //将该进程从阻塞队列中移除
+            add_to_queue(p_ready_queue, curr); //将该进程添加到就绪队列中
+        }
+        curr = curr->next;
+    }
+}
+
+void leave_critical_section(PCB* process,char lockmode, char file_addr[]) //离开共享区，释放锁
+{
+    LOCK* temlock = remove_from_lock_list(process,lockmode,file_addr,p_lock_in_use); //将锁从锁池中释放
+    if(temlock == NULL) //如果没有找到该锁，说明该进程没有占有该锁，直接返回
+        return;
+    free(temlock); //释放锁
+    printf("运行时间:%d   PID为 %d ,名称为 %s 的进程释放锁，锁模式为 %c,文件地址为 %s\n",timer,process->pid,process->process_name,lockmode,file_addr);
+    check_blocked_process_lock(); //检查阻塞队列中的进程，查看是否有进程可以解除阻塞
 }
 
 void run(){ // 这个函数以时间片为单位，每次经过一个时间片，就对创建的所有进程进行处理
