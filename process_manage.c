@@ -56,7 +56,8 @@ void add_to_queue(QUEUE *queue, PCB *process) //将PCB加入队列的函数
 void remove_from_queue(QUEUE *queue, PCB *process)  // 将PCB移除出队列的函数,返回值为该PCB
 {
     if ( strcmp(queue->queue_name,process->state) != 0) //如果队列名称与进程状态不符，说明不在此队列，返回
-        return;
+
+    return;
     PCB *prev = NULL, *curr = queue->head; //创建两个指针便于遍历队列，找到进程
     while (curr) 
     {
@@ -83,10 +84,11 @@ void remove_from_queue(QUEUE *queue, PCB *process)  // 将PCB移除出队列的�
         }
         prev = curr;
         curr = curr->next;
+
     }
 }
 
-PCB* priority_dispatch() //优先级调度算法，返回查找到的优先级最高的进程
+PCB* priority_dispatch() //优先级调度算法，当就绪队列非空时，返回查找到的优先级最高的进程
 {
     PCB *curr = ready_queue.head;
     int tem = curr->priority;
@@ -122,6 +124,49 @@ PCB* check_preemption(PCB* process_in_execute) // 检查是否需要抢占，并
         add_to_queue(p_running_queue, higher_priority_process);
 
         return higher_priority_process; // 返回被抢占的新进程
+    }
+    else{
+        return process_in_execute;
+    }
+}
+
+PCB* sjf_dispatch(){
+    // 短进程优先调度，返回剩余时间最短的进程的指针
+    PCB* curr = ready_queue.head;
+    int tem = curr->process_time_slot; // 剩余运行时间
+    PCB *dispatched_process = curr;
+
+    while(curr!=NULL) //遍历查找剩余时间最小的进程
+    {
+        if(curr->process_time_slot < tem) // 只有当优先级小时，才会切换；优先级相同时，不会切换
+        {
+            tem = curr->process_time_slot;
+            dispatched_process=curr;
+        }
+        curr = curr->next;
+    }
+    return dispatched_process;
+}
+
+PCB* check_shortest(PCB* process_in_execute) // 检查当前运行的进程是否是时间最短的，如果是则抢占
+{
+    PCB* shorter_process = sjf_dispatch(); // 找到时间更短的进程，不存在则返回NULL
+    if (shorter_process && shorter_process->process_time_slot < process_in_execute->process_time_slot) 
+    {
+        // 如果ready中选出的进程剩余时间比现在运行的短
+        printf("运行时间:%d   PID为 %d ,名称为 %s 的进程被剩余运行时间更短的进程PID为 %d ,名称为 %s 的进程抢占！\n",timer,
+        process_in_execute->pid, process_in_execute->process_name,
+        shorter_process->pid, shorter_process->process_name);
+
+        // 让当前进程回到 ready_queue
+        remove_from_queue(p_running_queue, process_in_execute);
+        add_to_queue(p_ready_queue, process_in_execute);
+
+        // 让高优先级进程执行
+        remove_from_queue(p_ready_queue, shorter_process);
+        add_to_queue(p_running_queue, shorter_process);
+
+        return shorter_process; // 返回被抢占的新进程
     }
     else{
         return process_in_execute;
@@ -186,10 +231,11 @@ PCB* get_now_process(int sche, int isP){ // 这个函数用于考虑调度算法
         return now;
     }
     else{
-        // 没有进程运行，或者抢占，此时需要重新找一个进程
+        // 现在没有进程运行，或者现在有进程运行，但是抢占式
         if(p_ready_queue->pcb_count == 0){
-            // 此时没有进程可供选择
-            return NULL;
+            // 此时没有进程可供选择，需要检查运行队列，如果运行队列为空，则真空了
+            if(p_running_queue->pcb_count == 0) return NULL;
+            else return now; // 继续运行现在的进程
         }
         else{
             // 有可以选择的，使用调度算法
@@ -201,21 +247,23 @@ PCB* get_now_process(int sche, int isP){ // 这个函数用于考虑调度算法
 
                 case 1:
                     //SJF调度算法
+                    if(now == NULL) return sjf_dispatch();
+                    else return check_shortest(now);
                     break;
 
                 case 2:
                     //优先级调度算法，在ready队列中，找优先级最高的进程
-                    if(now == NULL) priority_dispatch();
+                    if(now == NULL) return priority_dispatch();
                     else return check_preemption(now);
                     break;
 
                 case 3:
                     //轮询调度算法
+                    //return RR_dispatch();
                     break;
             }
         }
     }
-
 }
 
 void run(){ // 这个函数以时间片为单位，每次经过一个时间片，就对创建的所有进程进行处理
@@ -255,7 +303,8 @@ void run(){ // 这个函数以时间片为单位，每次经过一个时间片�
         timer += CPU_TIME_SLOT;
 
         if(process_in_execute != NULL){
-            process_in_execute->process_time_slot--;
+            process_in_execute->process_time_slot -= CPU_TIME_SLOT;
+
             if(process_in_execute->process_time_slot == 0){
                 // 说明这个进程运行结束了
                 printf("运行时间:%d   PID为 %d ,名称为 %s 的进程运行结束。\n", timer,process_in_execute->pid,

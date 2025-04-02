@@ -19,7 +19,7 @@ int main()
     }
 
     printf("请输入你所需要的进程调度算法序号：\n");
-    printf("0 -- FCFS \n1 -- SJF2\n2 -- 优先级\n3 -- RR\n");
+    printf("0 -- FCFS \n1 -- SJF\n2 -- 优先级\n3 -- RR\n");
     scanf("%d", &scheNum);
     printf("请输入算法是否是抢占式的：\n0 -- 非抢占式\n1 -- 抢占式\n");
     scanf("%d", &mode);
