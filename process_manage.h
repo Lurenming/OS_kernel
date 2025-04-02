@@ -23,7 +23,7 @@ int scheNum = 0; // 算法序号
 int mode = 0; // mode=0代表非抢占调度算法，=1代表抢占性
 
 typedef struct QUEUE {
-    char queue_name[10]; // 队列名称
+    char queue_name[20]; // 队列名称
     PCB *head;           // 队列头
     PCB *tail;           // 队列尾，方便插入
     int pcb_count;       // 队列进程数
