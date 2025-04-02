@@ -5,6 +5,7 @@
 
 #define MAX_PROCESSES 10 // 可调入CPU的最大进程数
 #define CPU_TIME_SLOT 1  // CPU时间片
+#define RR_TIME_SLOT 1  // RR方式的时间片长度，需要是CPU时间片长度的整数倍
 
 typedef struct PCB {
     int pid;                 // 进程编号
