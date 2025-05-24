@@ -3,29 +3,29 @@
 void handle_mkdir(const char* path) {
     int inode = create_entry(path, 1, 0755);
     if (inode == -1) {
-        printf("´´½¨Ä¿Â¼Ê§°Ü: %s\n", path);
+        printf("åˆ›å»ºç›®å½•å¤±è´¥: %s\n", path);
     }
     else {
-        printf("Ä¿Â¼´´½¨³É¹¦: %s\n", path);
+        printf("ç›®å½•åˆ›å»ºæˆåŠŸ: %s\n", path);
     }
 }
 
 void handle_touch(const char* path) {
     int inode = create_entry(path, 0, 0644);
     if (inode == -1) {
-        printf("´´½¨ÎÄ¼şÊ§°Ü: %s\n", path);
+        printf("åˆ›å»ºæ–‡ä»¶å¤±è´¥: %s\n", path);
     }
     else {
-        printf("ÎÄ¼ş´´½¨³É¹¦: %s\n", path);
+        printf("æ–‡ä»¶åˆ›å»ºæˆåŠŸ: %s\n", path);
     }
 }
 
 void handle_rm(const char* path) {
     if (delete_entry(path) == -1) {
-        printf("É¾³ıÊ§°Ü: %s\n", path);
+        printf("åˆ é™¤å¤±è´¥: %s\n", path);
     }
     else {
-        printf("³É¹¦É¾³ı: %s\n", path);
+        printf("æˆåŠŸåˆ é™¤: %s\n", path);
     }
 }
 
@@ -33,7 +33,7 @@ void handle_ls(const char* path) {
     int inode_num;
     const char* target_path = path ? path : "/";
     if (resolve_path(target_path, &inode_num) != 0) {
-        printf("Â·¾¶²»´æÔÚ: %s\n", target_path);
+        printf("è·¯å¾„ä¸å­˜åœ¨: %s\n", target_path);
         return;
     }
     dir_ls(inode_num);
@@ -42,56 +42,57 @@ void handle_ls(const char* path) {
 void handle_write(const char* path, const char* data) {
     OS_FILE* f = Open_File(path, RDWR);
     if (!f) {
-        printf("ÎŞ·¨´ò¿ªÎÄ¼ş: %s\n", path);
+        printf("æ— æ³•æ‰“å¼€æ–‡ä»¶: %s\n", path);
         return;
     }
     int written = file_write(f, data, strlen(data));
     Close_File(f);
     if (written < 0) {
-        printf("Ğ´ÈëÊ§°Ü\n");
+        printf("å†™å…¥å¤±è´¥\n");
     }
     else {
-        printf("³É¹¦Ğ´Èë %d ×Ö½Úµ½ %s\n", written, path);
+        printf("æˆåŠŸå†™å…¥ %d å­—èŠ‚åˆ° %s\n", written, path);
     }
 }
 
 void handle_read(const char* path) {
     OS_FILE* f = Open_File(path, RDONLY);
     if (!f) {
-        printf("ÎŞ·¨´ò¿ªÎÄ¼ş: %s\n", path);
+        printf("æ— æ³•æ‰“å¼€æ–‡ä»¶: %s\n", path);
         return;
     }
     char buf[MAX_FILE_SIZE + 1] = { 0 };
     int read_bytes = file_read(f, buf, MAX_FILE_SIZE);
     Close_File(f);
     if (read_bytes < 0) {
-        printf("¶ÁÈ¡Ê§°Ü\n");
+        printf("è¯»å–å¤±è´¥\n");
     }
     else {
-        printf("ÎÄ¼şÄÚÈİ (%d bytes):\n%.*s\n", read_bytes, read_bytes, buf);
+        printf("æ–‡ä»¶å†…å®¹ (%d bytes):\n%.*s\n", read_bytes, read_bytes, buf);
     }
 }
 
 void print_help() {
-    printf("\n¿ÉÓÃÃüÁî:\n");
-    printf("  mkdir <Â·¾¶>       ´´½¨Ä¿Â¼\n");
-    printf("  touch <Â·¾¶>       ´´½¨ÎÄ¼ş\n");
-    printf("  rm <Â·¾¶>          É¾³ıÎÄ¼ş»òÄ¿Â¼\n");
-    printf("  ls [Â·¾¶]          ÁĞ³öÄ¿Â¼ÄÚÈİ\n");
-    printf("  write <Â·¾¶> <Êı¾İ> Ğ´ÈëÎÄ¼ş\n");
-    printf("  read <Â·¾¶>        ¶ÁÈ¡ÎÄ¼ş\n");
-    printf("  help              ÏÔÊ¾°ïÖúĞÅÏ¢\n");
-    printf("  exit              ÍË³öÏµÍ³\n\n");
+    printf("\nå¯ç”¨å‘½ä»¤:\n");
+    //printf("  run       \è¿è¡Œè¿›ç¨‹\n")
+    printf("  mkdir <è·¯å¾„>       åˆ›å»ºç›®å½•\n");
+    printf("  touch <è·¯å¾„>       åˆ›å»ºæ–‡ä»¶\n");
+    printf("  rm <è·¯å¾„>          åˆ é™¤æ–‡ä»¶æˆ–ç›®å½•\n");
+    printf("  ls [è·¯å¾„]          åˆ—å‡ºç›®å½•å†…å®¹\n");
+    printf("  write <è·¯å¾„> <æ•°æ®> å†™å…¥æ–‡ä»¶\n");
+    printf("  read <è·¯å¾„>        è¯»å–æ–‡ä»¶\n");
+    printf("  help              æ˜¾ç¤ºå¸®åŠ©ä¿¡æ¯\n");
+    printf("  exit              é€€å‡ºç³»ç»Ÿ\n\n");
 }
 
 int main() {
-    // ³õÊ¼»¯ÎÄ¼şÏµÍ³
-    printf("³õÊ¼»¯ÎÄ¼şÏµÍ³...\n");
+    // åˆå§‹åŒ–æ–‡ä»¶ç³»ç»Ÿ
+    printf("åˆå§‹åŒ–æ–‡ä»¶ç³»ç»Ÿ...\n");
     if (!disk_format() || !disk_init()) {
-        printf("³õÊ¼»¯Ê§°Ü!\n");
+        printf("åˆå§‹åŒ–å¤±è´¥!\n");
         return 1;
     }
-    printf("ÎÄ¼şÏµÍ³³õÊ¼»¯Íê³É\n");
+    printf("æ–‡ä»¶ç³»ç»Ÿåˆå§‹åŒ–å®Œæˆ\n");
 
     char input[256];
     print_help();
@@ -101,10 +102,10 @@ int main() {
         fflush(stdout);
         if (!fgets(input, sizeof(input), stdin)) break;
 
-        // È¥³ı»»ĞĞ·û
+        // å»é™¤æ¢è¡Œç¬¦
         input[strcspn(input, "\n")] = '\0';
 
-        // ·Ö¸îÃüÁîºÍ²ÎÊı
+        // åˆ†å‰²å‘½ä»¤å’Œå‚æ•°
         char* cmd = strtok(input, " ");
         if (!cmd) continue;
 
@@ -117,17 +118,17 @@ int main() {
         else if (strcmp(cmd, "mkdir") == 0) {
             char* path = strtok(NULL, " ");
             if (path) handle_mkdir(path);
-            else printf("ÓÃ·¨: mkdir <¾ø¶ÔÂ·¾¶>\n");
+            else printf("ç”¨æ³•: mkdir <ç»å¯¹è·¯å¾„>\n");
         }
         else if (strcmp(cmd, "touch") == 0) {
             char* path = strtok(NULL, " ");
             if (path) handle_touch(path);
-            else printf("ÓÃ·¨: touch <¾ø¶ÔÂ·¾¶>\n");
+            else printf("ç”¨æ³•: touch <ç»å¯¹è·¯å¾„>\n");
         }
         else if (strcmp(cmd, "rm") == 0) {
             char* path = strtok(NULL, " ");
             if (path) handle_rm(path);
-            else printf("ÓÃ·¨: rm <¾ø¶ÔÂ·¾¶>\n");
+            else printf("ç”¨æ³•: rm <ç»å¯¹è·¯å¾„>\n");
         }
         else if (strcmp(cmd, "ls") == 0) {
             char* path = strtok(NULL, " ");
@@ -137,18 +138,18 @@ int main() {
             char* path = strtok(NULL, " ");
             char* data = strtok(NULL, "");
             if (path && data) handle_write(path, data);
-            else printf("ÓÃ·¨: write <¾ø¶ÔÂ·¾¶> <Êı¾İÄÚÈİ>\n");
+            else printf("ç”¨æ³•: write <ç»å¯¹è·¯å¾„> <æ•°æ®å†…å®¹>\n");
         }
         else if (strcmp(cmd, "read") == 0) {
             char* path = strtok(NULL, " ");
             if (path) handle_read(path);
-            else printf("ÓÃ·¨: read <¾ø¶ÔÂ·¾¶>\n");
+            else printf("ç”¨æ³•: read <ç»å¯¹è·¯å¾„>\n");
         }
         else {
-            printf("Î´ÖªÃüÁî: %s (ÊäÈëhelp²é¿´°ïÖú)\n", cmd);
+            printf("æœªçŸ¥å‘½ä»¤: %s (è¾“å…¥helpæŸ¥çœ‹å¸®åŠ©)\n", cmd);
         }
     }
 
-    printf("\nÎÄ¼şÏµÍ³ÍË³ö\n");
+    printf("\næ–‡ä»¶ç³»ç»Ÿé€€å‡º\n");
     return 0;
 }

@@ -1,10 +1,8 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS 1
 #include "filemanagement.h"
-
-
-//----------------´ÅÅÌ²Ù×÷º¯Êı----------------
-
-// ¸ñÊ½»¯´ÅÅÌ£º½«´ÅÅÌÎÄ¼şĞ´Èë0
+//----------------ç£ç›˜æ“ä½œå‡½æ•°----------------
+// 
+// æ ¼å¼åŒ–ç£ç›˜ï¼šå°†ç£ç›˜æ–‡ä»¶å†™å…¥0
 bool disk_format() {
     FILE* fp = fopen(DEV_NAME, "wb");
     if (!fp) return false;
@@ -14,63 +12,63 @@ bool disk_format() {
         fwrite(zero, BLOCK_SIZE, 1, fp);
     }
     fclose(fp);
-    printf("´ÅÅÌ¸ñÊ½»¯Íê³É\n");
+    printf("ç£ç›˜æ ¼å¼åŒ–å®Œæˆ\n");
     return true;
 }
 
-// ³õÊ¼»¯´ÅÅÌ£ºĞ´Èë³¬¼¶¿é¡¢inode±í£¬²¢´´½¨¸ùÄ¿Â¼
+// åˆå§‹åŒ–ç£ç›˜ï¼šå†™å…¥è¶…çº§å—ã€inodeè¡¨ï¼Œå¹¶åˆ›å»ºæ ¹ç›®å½•
 bool disk_init() {
     FILE* fp = fopen(DEV_NAME, "r+b");
     if (!fp) return false;
 
-    // ³õÊ¼»¯³¬¼¶¿é
+    // åˆå§‹åŒ–è¶…çº§å—
     super_block sb = { iNode_NUM, MAX_BLOCK, MAX_FILE_SIZE };
     fwrite(&sb, sizeof(super_block), 1, fp);
 
-    // Çå¿ÕiNode±í
+    // æ¸…ç©ºiNodeè¡¨
     iNode empty_inode = { 0 };
     fseek(fp, INODE_START * BLOCK_SIZE, SEEK_SET);
     for (int i = 0; i < iNode_NUM; i++) {
         fwrite(&empty_inode, sizeof(iNode), 1, fp);
     }
 
-    // ³õÊ¼»¯Î»Í¼
+    // åˆå§‹åŒ–ä½å›¾
     char bitmap[MAX_BLOCK] = { 0 };
 
-    // ±ê¼ÇÏµÍ³¿éÎªÒÑÊ¹ÓÃ£¨°üÀ¨¸ùÄ¿Â¼¿é£©
+    // æ ‡è®°ç³»ç»Ÿå—ä¸ºå·²ä½¿ç”¨ï¼ˆåŒ…æ‹¬æ ¹ç›®å½•å—ï¼‰
     for (int i = 0; i < DATA_START; i++) {
         bitmap[i] = 1;  // 0 ~ DATA_START-1
     }
-    bitmap[DATA_START] = 1;  // ¸ùÄ¿Â¼Êı¾İ¿é±ê¼ÇÎªÒÑÊ¹ÓÃ
+    bitmap[DATA_START] = 1;  // æ ¹ç›®å½•æ•°æ®å—æ ‡è®°ä¸ºå·²ä½¿ç”¨
 
     fseek(fp, BITMAP_START * BLOCK_SIZE, SEEK_SET);
     fwrite(bitmap, MAX_BLOCK, 1, fp);
 
-    // ³õÊ¼»¯¸ùÄ¿Â¼
+    // åˆå§‹åŒ–æ ¹ç›®å½•
     directory root_dir = { 0 };
     iNode root_inode = { 0, sizeof(directory), 2, {DATA_START}, 0 };
 
-    fseek(fp, INODE_START * BLOCK_SIZE, SEEK_SET);//¸ù½ÚµãĞÅÏ¢Ğ´»Øinode0
+    fseek(fp, INODE_START * BLOCK_SIZE, SEEK_SET);//æ ¹èŠ‚ç‚¹ä¿¡æ¯å†™å›inode0
     fwrite(&root_inode, sizeof(iNode), 1, fp);
 
-    fseek(fp, DATA_START * BLOCK_SIZE, SEEK_SET);//¸ùÄ¿Â¼ĞÅÏ¢Ğ´ÈëÊı¾İ¿é
+    fseek(fp, DATA_START * BLOCK_SIZE, SEEK_SET);//æ ¹ç›®å½•ä¿¡æ¯å†™å…¥æ•°æ®å—
     fwrite(&root_dir, sizeof(directory), 1, fp);
 
     fclose(fp);
-    printf("¸ùÄ¿Â¼ÒÑ³õÊ¼»¯\n");
+    printf("æ ¹ç›®å½•å·²åˆå§‹åŒ–\n");
     return true;
 }
 
-// ÏòÖ¸¶¨´ÅÅÌ¿éĞ´ÈëÊı¾İ
+// å‘æŒ‡å®šç£ç›˜å—å†™å…¥æ•°æ®
 bool block_write(long block, char* buf) {
     if (block < 0 || block >= MAX_BLOCK) {
-        printf("ÎŞĞ§µÄ¿éºÅ£º%ld\n", block);
+        printf("æ— æ•ˆçš„å—å·ï¼š%ld\n", block);
         return false;
     }
 
     FILE* fp = fopen(DEV_NAME, "r+b");
     if (!fp) {
-        perror("¿éĞ´ÈëÊ§°Ü");
+        perror("å—å†™å…¥å¤±è´¥");
         return false;
     }
 
@@ -78,20 +76,20 @@ bool block_write(long block, char* buf) {
     fwrite(buf, sizeof(char), BLOCK_SIZE, fp);
     fclose(fp);
 
-    //printf("³É¹¦Ğ´Èë´ÅÅÌ¿é %ld\n", block);
+    //printf("æˆåŠŸå†™å…¥ç£ç›˜å— %ld\n", block);
     return true;
 }
 
-// ´ÓÖ¸¶¨´ÅÅÌ¿é¶ÁÈ¡Êı¾İ
+// ä»æŒ‡å®šç£ç›˜å—è¯»å–æ•°æ®
 bool block_read(long block, char* buf) {
     if (block < 0 || block >= MAX_BLOCK) {
-        printf("ÎŞĞ§µÄ¿éºÅ£º%ld\n", block);
+        printf("æ— æ•ˆçš„å—å·ï¼š%ld\n", block);
         return false;
     }
 
     FILE* fp = fopen(DEV_NAME, "rb");
     if (!fp) {
-        perror("¿é¶ÁÈ¡Ê§°Ü");
+        perror("å—è¯»å–å¤±è´¥");
         return false;
     }
 
@@ -99,84 +97,84 @@ bool block_read(long block, char* buf) {
     fread(buf, sizeof(char), BLOCK_SIZE, fp);
     fclose(fp);
 
-    //printf("³É¹¦¶ÁÈ¡´ÅÅÌ¿é %ld\n", block);
+    //printf("æˆåŠŸè¯»å–ç£ç›˜å— %ld\n", block);
     return true;
 }
 
-// ²éÕÒµÚÒ»¸ö¿ÕÏĞ¿é£¬ĞŞ¸Ä bitmap ±íÊ¾¸Ã¿é±»Õ¼ÓÃ£¬²¢·µ»Ø¿éºÅ
+// æŸ¥æ‰¾ç¬¬ä¸€ä¸ªç©ºé—²å—ï¼Œä¿®æ”¹ bitmap è¡¨ç¤ºè¯¥å—è¢«å ç”¨ï¼Œå¹¶è¿”å›å—å·
 int alloc_first_free_block() {
     FILE* fp = fopen(DEV_NAME, "rb+");
     if (!fp) {
-        perror("´ò¿ª´ÅÅÌÎÄ¼şÊ§°Ü");
+        perror("æ‰“å¼€ç£ç›˜æ–‡ä»¶å¤±è´¥");
         return -1;
     }
 
     char* bitmap = (char*)malloc(MAX_BLOCK);
     if (!bitmap) {
-        perror("ÄÚ´æ·ÖÅäÊ§°Ü");
+        perror("å†…å­˜åˆ†é…å¤±è´¥");
         fclose(fp);
         return -1;
     }
 
     fseek(fp, BITMAP_START * BLOCK_SIZE, SEEK_SET);
-    fread(bitmap, sizeof(char), MAX_BLOCK, fp);//´Ó´ÅÅÌÖĞ¶Á³öbitmap
+    fread(bitmap, sizeof(char), MAX_BLOCK, fp);//ä»ç£ç›˜ä¸­è¯»å‡ºbitmap
 
     for (int i = 0; i < MAX_BLOCK; i++) {
-        if (bitmap[i] == 0) { // ÕÒµ½¿ÕÏĞ¿é
-            bitmap[i] = 1; // ±ê¼ÇÎªÕ¼ÓÃ
+        if (bitmap[i] == 0) { // æ‰¾åˆ°ç©ºé—²å—
+            bitmap[i] = 1; // æ ‡è®°ä¸ºå ç”¨
 
-            // ½« bitmap Ğ´»Ø´ÅÅÌ
+            // å°† bitmap å†™å›ç£ç›˜
             fseek(fp, BITMAP_START * BLOCK_SIZE, SEEK_SET);
             fwrite(bitmap, sizeof(char), MAX_BLOCK, fp);
 
             free(bitmap);
             fclose(fp);
-            return i; // ·µ»Ø·ÖÅäµÄ¿éºÅ
+            return i; // è¿”å›åˆ†é…çš„å—å·
         }
     }
 
     free(bitmap);
     fclose(fp);
-    printf("Ã»ÓĞ¿ÉÓÃµÄ´ÅÅÌ¿é¡£\n");
-    return -1; // ÎŞ¿ÉÓÃ¿é
+    printf("æ²¡æœ‰å¯ç”¨çš„ç£ç›˜å—ã€‚\n");
+    return -1; // æ— å¯ç”¨å—
 }
 
-// ÊÍ·ÅÒ»¸öÒÑÕ¼ÓÃµÄ¿é
+// é‡Šæ”¾ä¸€ä¸ªå·²å ç”¨çš„å—
 int free_allocated_block(int block_num) {
     if (block_num < DATA_START) {
-        printf("¹Ø¼üÏµÍ³¿éÎŞ·¨±»ÊÍ·Å¡£\n");
+        printf("å…³é”®ç³»ç»Ÿå—æ— æ³•è¢«é‡Šæ”¾ã€‚\n");
         return 0;
     }
 
     FILE* fp = fopen(DEV_NAME, "rb+");
     if (!fp) {
-        perror("´ò¿ª´ÅÅÌÎÄ¼şÊ§°Ü");
+        perror("æ‰“å¼€ç£ç›˜æ–‡ä»¶å¤±è´¥");
         return 0;
     }
 
     char* bitmap = (char*)malloc(MAX_BLOCK);
-    char* empty_block = (char*)calloc(BLOCK_SIZE, sizeof(char)); // ÓÃÓÚÇå¿ÕÊı¾İ¿é
+    char* empty_block = (char*)calloc(BLOCK_SIZE, sizeof(char)); // ç”¨äºæ¸…ç©ºæ•°æ®å—
 
     if (!bitmap || !empty_block) {
-        perror("ÄÚ´æ·ÖÅäÊ§°Ü");
+        perror("å†…å­˜åˆ†é…å¤±è´¥");
         fclose(fp);
         free(bitmap);
         free(empty_block);
         return 0;
     }
 
-    // ¶ÁÈ¡ bitmap
+    // è¯»å– bitmap
     fseek(fp, BITMAP_START * BLOCK_SIZE, SEEK_SET);
     fread(bitmap, sizeof(char), MAX_BLOCK, fp);
 
-    // ÊÍ·ÅÖ¸¶¨¿é
+    // é‡Šæ”¾æŒ‡å®šå—
     bitmap[block_num] = 0;
 
-    // Ğ´»Ø bitmap
+    // å†™å› bitmap
     fseek(fp, BITMAP_START * BLOCK_SIZE, SEEK_SET);
     fwrite(bitmap, sizeof(char), MAX_BLOCK, fp);
 
-    // Çå¿Õ´ÅÅÌ¿éÊı¾İ
+    // æ¸…ç©ºç£ç›˜å—æ•°æ®
     fseek(fp, block_num * BLOCK_SIZE, SEEK_SET);
     fwrite(empty_block, sizeof(char), BLOCK_SIZE, fp);
 
@@ -186,7 +184,7 @@ int free_allocated_block(int block_num) {
     return 1;
 }
 
-//²éÕÒµ½µÚÒ»¸ö¿ÕÏĞµÄindoe½Úµã
+//æŸ¥æ‰¾åˆ°ç¬¬ä¸€ä¸ªç©ºé—²çš„indoeèŠ‚ç‚¹
 int find_free_inode() {
     FILE* fp = fopen(DEV_NAME, "rb");
     iNode node;
@@ -202,11 +200,11 @@ int find_free_inode() {
     return -1;
 }
 
-// ´Ó´ÅÅÌÖĞ¶ÁÈ¡Ö¸¶¨inode£¨inode±íÎ»ÓÚµÚINODE_START¿é¿ªÊ¼£©
+// ä»ç£ç›˜ä¸­è¯»å–æŒ‡å®šinodeï¼ˆinodeè¡¨ä½äºç¬¬INODE_STARTå—å¼€å§‹ï¼‰
 int get_inode(int inode_num, iNode* inode) {
     FILE* fp = fopen(DEV_NAME, "rb");
     if (!fp) {
-        perror("get_inode: ÎŞ·¨´ò¿ª´ÅÅÌÎÄ¼ş");
+        perror("get_inode: æ— æ³•æ‰“å¼€ç£ç›˜æ–‡ä»¶");
         return -1;
     }
     fseek(fp, INODE_START * BLOCK_SIZE + inode_num * sizeof(iNode), SEEK_SET);
@@ -215,211 +213,96 @@ int get_inode(int inode_num, iNode* inode) {
     return 0;
 }
 
-//----------------ÎÄ¼ş²Ù×÷º¯Êı----------------
-
-// Â·¾¶½âÎöº¯Êı£º´Ó¸ùÄ¿Â¼¿ªÊ¼£¬ÒÀ´Î½âÎöÂ·¾¶ÖĞµÄ¸÷¸öÄ¿Â¼£¨ÒÔ'/'·Ö¸ô£©£¬·µ»ØÄ¿±êÎÄ¼ş»òÄ¿Â¼¶ÔÓ¦µÄinode±àºÅ¡£
-int resolve_path(const char* path, int* inode_num_out) {
-    //printf("DEBUG: ½âÎöÂ·¾¶: %s\n", path);
-
-    // ¼ì²éÊäÈë²ÎÊı
-    if (!path || !inode_num_out) {
-        //printf("DEBUG: ÎŞĞ§µÄÊäÈë²ÎÊı\n");
-        return -1;
-    }
-
-    // ´¦Àí¸ùÄ¿Â¼Çé¿ö
-    if (path[0] == '/' && strlen(path) == 1) {
-        //printf("DEBUG: ·µ»Ø¸ùÄ¿Â¼inode 0\n");
-        *inode_num_out = 0; // ¸ùÄ¿Â¼inode
-        return 0;
-    }
-
-    char path_copy[PATH_LENGTH];
-    strncpy(path_copy, path, PATH_LENGTH - 1);
-    path_copy[PATH_LENGTH - 1] = '\0';
-
-    // È·±£Â·¾¶ÒÔ'/'¿ªÍ·
-    if (path_copy[0] != '/') {
-        printf("DEBUG: ÎŞĞ§Â·¾¶: ±ØĞëÒÔ'/'¿ªÍ·\n");
-        return -1;
-    }
-
-    // ´Ó¸ùÄ¿Â¼¿ªÊ¼
-    int current_inode_num = 0;
-    iNode current_inode;
-    if (get_inode(current_inode_num, &current_inode) < 0) {
-        printf("DEBUG: »ñÈ¡¸ùÄ¿Â¼inodeÊ§°Ü\n");
-        return -1;
-    }
-
-    // Ìø¹ıÂ·¾¶¿ªÍ·µÄ'/'
-    char* path_ptr = path_copy + 1;
-
-    // Èç¹ûÂ·¾¶Îª¿Õ(Ö»ÓĞÒ»¸ö'/')
-    if (*path_ptr == '\0') {
-        *inode_num_out = current_inode_num;
-        return 0;
-    }
-
-    char component[Name_length];
-    char* next_slash;
-
-    // Öğ¼¶½âÎöÂ·¾¶
-    while (*path_ptr) {
-        // ÌáÈ¡µ±Ç°Â·¾¶×é¼ş
-        next_slash = strchr(path_ptr, '/');//²éÕÒÏÂ¸ö'/'
-        if (next_slash) {
-            int len = next_slash - path_ptr;
-            if (len >= Name_length) len = Name_length - 1;
-            strncpy(component, path_ptr, len);
-            component[len] = '\0';//ÕÒµ½Ä¿Â¼Ãû³Æ
-            path_ptr = next_slash + 1;
-        }
-        else {
-            strncpy(component, path_ptr, Name_length - 1);
-            component[Name_length - 1] = '\0';
-            path_ptr += strlen(path_ptr);
-        }
-
-        //printf("DEBUG: µ±Ç°½âÎö×é¼ş: '%s', µ±Ç°inode: %d\n", component, current_inode_num);
-
-        // Ìø¹ı¿Õ×é¼ş
-        if (strlen(component) == 0) {
-            continue;
-        }
-
-        // È·±£µ±Ç°½ÚµãÊÇÄ¿Â¼
-        if (current_inode.i_mode != 0) {
-            printf("DEBUG: ´íÎó: inode %d ²»ÊÇÄ¿Â¼\n", current_inode_num);
-            return -1;
-        }
-
-        // ¶ÁÈ¡Ä¿Â¼ÄÚÈİ
-        directory dir;
-        if (!block_read(current_inode.block_address[0], (char*)&dir)) {
-            printf("DEBUG: ÎŞ·¨¶ÁÈ¡Ä¿Â¼ÄÚÈİ, inode: %d, ¿é: %d\n",
-                current_inode_num, current_inode.block_address[0]);
-            return -1;
-        }
-
-        // ÔÚÄ¿Â¼ÖĞ²éÕÒ×é¼ş
-        int found = 0;
-        for (int i = 0; i < dir.num_entries; i++) {
-            //printf("DEBUG: ¼ì²éÌõÄ¿ %d: '%s'\n", i, dir.entries[i].name);
-            if (strncmp(dir.entries[i].name, component, Name_length) == 0) {
-                current_inode_num = dir.entries[i].inode;
-                found = 1;
-                //printf("DEBUG: ÕÒµ½Æ¥Åä! ĞÂinode: %d\n", current_inode_num);
-
-                // »ñÈ¡ĞÂinodeĞÅÏ¢
-                if (get_inode(current_inode_num, &current_inode) < 0) {
-                    //printf("DEBUG: ÎŞ·¨»ñÈ¡inode %d\n", current_inode_num);
-                    return -1;
-                }
-                break;
-            }
-        }
-
-        if (!found) {
-            //printf("DEBUG: Î´ÕÒµ½Â·¾¶×é¼ş '%s'\n", component);
-            return -1;
-        }
-    }
-
-    // ³É¹¦ÕÒµ½Â·¾¶¶ÔÓ¦µÄinode
-    *inode_num_out = current_inode_num;
-    //printf("DEBUG: ³É¹¦½âÎöÂ·¾¶ '%s' µ½inode %d\n", path, current_inode_num);
-    return 0;
-}
-
+//----------------æ–‡ä»¶æ“ä½œå‡½æ•°----------------
+//åˆ›å»ºæ–‡ä»¶/ç›®å½•
 int create_entry(const char* path, int is_dir, int permission) {
-    //printf("DEBUG: ¿ªÊ¼´´½¨ÌõÄ¿: %s, ÀàĞÍ: %s, È¨ÏŞ: %o\n", 
-           //path, is_dir ? "Ä¿Â¼" : "ÎÄ¼ş", permission);
+    //printf("DEBUG: å¼€å§‹åˆ›å»ºæ¡ç›®: %s, ç±»å‹: %s, æƒé™: %o\n", 
+           //path, is_dir ? "ç›®å½•" : "æ–‡ä»¶", permission);
 
-    // Â·¾¶ÓĞĞ§ĞÔ¼ì²é
+    // è·¯å¾„æœ‰æ•ˆæ€§æ£€æŸ¥
     if (strlen(path) == 0 || path[0] != '/') {
-        //printf("DEBUG: ÎŞĞ§Â·¾¶: %s (±ØĞëÒÔ'/'¿ªÍ·ÇÒ²»Îª¿Õ)\n", path);
+        //printf("DEBUG: æ— æ•ˆè·¯å¾„: %s (å¿…é¡»ä»¥'/'å¼€å¤´ä¸”ä¸ä¸ºç©º)\n", path);
         return -1;
     }
 
-    // ·Ö¸î¸¸Ä¿Â¼ºÍÎÄ¼şÃû
+    // åˆ†å‰²çˆ¶ç›®å½•å’Œæ–‡ä»¶å
     char parent_path[PATH_LENGTH] = { 0 };
     char name[Name_length] = { 0 };
-    const char* last_slash = strrchr(path, '/');
+    const char* last_slash = strrchr(path, '/');//æœ€åä¸€ä¸ª'/'
 
-    // ´¦Àí¸ùÄ¿Â¼ÌØÊâÇé¿ö
+    // å¤„ç†æ ¹ç›®å½•ç‰¹æ®Šæƒ…å†µ
     if (last_slash == path && strlen(path) == 1) {
-        printf("DEBUG: ²»ÄÜ´´½¨¸ùÄ¿Â¼\n");
+        printf("DEBUG: ä¸èƒ½åˆ›å»ºæ ¹ç›®å½•\n");
         return -1;
     }
 
-    // ÌáÈ¡¸¸Ä¿Â¼Â·¾¶
-    if (last_slash != path) {  // ·Ç¸ùÄ¿Â¼ÏÂµÄÇé¿ö
+    // æå–çˆ¶ç›®å½•è·¯å¾„
+    if (last_slash != path) {  // éæ ¹ç›®å½•ä¸‹çš„æƒ…å†µ
         strncpy(parent_path, path, last_slash - path);
         parent_path[last_slash - path] = '\0';
-        //printf("DEBUG: ¸¸Ä¿Â¼Â·¾¶: %s\n", parent_path);
+        //printf("DEBUG: çˆ¶ç›®å½•è·¯å¾„: %s\n", parent_path);
     }
-    else {  // ¸ùÄ¿Â¼Ö±½Ó´´½¨ÌõÄ¿
+    else {  // æ ¹ç›®å½•ç›´æ¥åˆ›å»ºæ¡ç›®
         strcpy(parent_path, "/");
-        //printf("DEBUG: ¸¸Ä¿Â¼Â·¾¶: / (¸ùÄ¿Â¼)\n");
+        //printf("DEBUG: çˆ¶ç›®å½•è·¯å¾„: / (æ ¹ç›®å½•)\n");
     }
 
-    // ÌáÈ¡ÎÄ¼şÃû²¢±£Ö¤ÖÕÖ¹·û
+    // æå–æ–‡ä»¶åå¹¶ä¿è¯ç»ˆæ­¢ç¬¦
     strncpy(name, last_slash + 1, Name_length - 1);
     name[Name_length - 1] = '\0';
-    //printf("DEBUG: ÌõÄ¿Ãû³Æ: %s\n", name);
+    //printf("DEBUG: æ¡ç›®åç§°: %s\n", name);
 
-    // »ñÈ¡¸¸Ä¿Â¼inode
+    // è·å–çˆ¶ç›®å½•inode
     int parent_inode;
-    //printf("DEBUG: ½âÎö¸¸Ä¿Â¼Â·¾¶: %s\n", parent_path);
+    //printf("DEBUG: è§£æçˆ¶ç›®å½•è·¯å¾„: %s\n", parent_path);
     if (resolve_path(parent_path, &parent_inode) != 0) {
-        //printf("DEBUG: ¸¸Ä¿Â¼²»´æÔÚ: %s\n", parent_path);
+        //printf("DEBUG: çˆ¶ç›®å½•ä¸å­˜åœ¨: %s\n", parent_path);
         return -1;
     }
-    //printf("DEBUG: ¸¸Ä¿Â¼inode: %d\n", parent_inode);
+    //printf("DEBUG: çˆ¶ç›®å½•inode: %d\n", parent_inode);
 
-    // ¶ÁÈ¡¸¸Ä¿Â¼inodeºÍÄ¿Â¼ÄÚÈİ
+    // è¯»å–çˆ¶ç›®å½•inodeå’Œç›®å½•å†…å®¹
     iNode parent_node;
     directory parent_dir;
 
     if (get_inode(parent_inode, &parent_node) != 0) {
-        //printf("DEBUG: ÎŞ·¨¶ÁÈ¡¸¸Ä¿Â¼inode\n");
+        //printf("DEBUG: æ— æ³•è¯»å–çˆ¶ç›®å½•inode\n");
         return -1;
     }
-    //printf("DEBUG: ¸¸Ä¿Â¼Ä£Ê½: %d, ´óĞ¡: %d\n", parent_node.i_mode, parent_node.i_size);
+    //printf("DEBUG: çˆ¶ç›®å½•æ¨¡å¼: %d, å¤§å°: %d\n", parent_node.i_mode, parent_node.i_size);
 
     if (parent_node.i_mode != 0) {
-        printf("DEBUG: ¸¸Â·¾¶²»ÊÇÄ¿Â¼\n");
+        printf("DEBUG: çˆ¶è·¯å¾„ä¸æ˜¯ç›®å½•\n");
         return -1;
     }
 
     if (!block_read(parent_node.block_address[0], (char*)&parent_dir)) {
-        printf("DEBUG: ÎŞ·¨¶ÁÈ¡¸¸Ä¿Â¼ÄÚÈİ, ¿éµØÖ·: %d\n", parent_node.block_address[0]);
+        printf("DEBUG: æ— æ³•è¯»å–çˆ¶ç›®å½•å†…å®¹, å—åœ°å€: %d\n", parent_node.block_address[0]);
         return -1;
     }
-    //printf("DEBUG: ¸¸Ä¿Â¼ÌõÄ¿Êı: %d/%d\n", parent_dir.num_entries, DIR_NUM);
+    //printf("DEBUG: çˆ¶ç›®å½•æ¡ç›®æ•°: %d/%d\n", parent_dir.num_entries, DIR_NUM);
 
-    // ¼ì²éÎÄ¼şÃûÊÇ·ñÒÑ´æÔÚ
+    // æ£€æŸ¥æ–‡ä»¶åæ˜¯å¦å·²å­˜åœ¨
     for (int i = 0; i < parent_dir.num_entries; i++) {
-        //printf("DEBUG: ¼ì²éÌõÄ¿ %d: %s\n", i, parent_dir.entries[i].name);
+        //printf("DEBUG: æ£€æŸ¥æ¡ç›® %d: %s\n", i, parent_dir.entries[i].name);
         if (strncmp(parent_dir.entries[i].name, name, Name_length) == 0) {
-            printf("DEBUG: Ãû³Æ³åÍ»: %s\n", name);
+            printf("DEBUG: åç§°å†²çª: %s\n", name);
             return -1;
         }
     }
 
-    // ·ÖÅäĞÂinode
+    // åˆ†é…æ–°inode
     int new_inode = find_free_inode();
     if (new_inode == -1) {
-        printf("DEBUG: iNodeºÄ¾¡\n");
+        printf("DEBUG: iNodeè€—å°½\n");
         return -1;
     }
-    //printf("DEBUG: ·ÖÅäµÄĞÂinode: %d\n", new_inode);
+    //printf("DEBUG: åˆ†é…çš„æ–°inode: %d\n", new_inode);
 
-    // ³õÊ¼»¯inode½á¹¹
+    // åˆå§‹åŒ–inodeç»“æ„
     iNode new_node = {
         .i_mode = is_dir ? 0 : 1,
-        .i_size = 0,  // ³õÊ¼´óĞ¡Îª0
+        .i_size = 0,  // åˆå§‹å¤§å°ä¸º0
         //.permission = permission,
         //.ctime = time(NULL),
         //.mtime = time(NULL),
@@ -427,22 +310,22 @@ int create_entry(const char* path, int is_dir, int permission) {
         .open_num = 0
     };
 
-    // Çå¿Õ¿éµØÖ·Êı×é
+    // æ¸…ç©ºå—åœ°å€æ•°ç»„
     memset(new_node.block_address, 0, sizeof(new_node.block_address));
 
-    // ´¦ÀíÄ¿Â¼ÀàĞÍ³õÊ¼»¯
+    // å¤„ç†ç›®å½•ç±»å‹åˆå§‹åŒ–
     if (is_dir) {
         int new_block = alloc_first_free_block();
         if (new_block == -1) {
-            printf("DEBUG: ÎŞ·¨·ÖÅäÊı¾İ¿é\n");
+            printf("DEBUG: æ— æ³•åˆ†é…æ•°æ®å—\n");
             return -1;
         }
-        //printf("DEBUG: ÎªÄ¿Â¼·ÖÅäµÄÊı¾İ¿é: %d\n", new_block);
+        //printf("DEBUG: ä¸ºç›®å½•åˆ†é…çš„æ•°æ®å—: %d\n", new_block);
 
-        // ³õÊ¼»¯¿ÕÄ¿Â¼
-        directory new_dir = { 0 }; // ÌõÄ¿ÊıÉèÎª0
+        // åˆå§‹åŒ–ç©ºç›®å½•
+        directory new_dir = { 0 }; // æ¡ç›®æ•°è®¾ä¸º0
         if (!block_write(new_block, (char*)&new_dir)) {
-            printf("DEBUG: Ğ´ÈëĞÂÄ¿Â¼Êı¾İÊ§°Ü\n");
+            printf("DEBUG: å†™å…¥æ–°ç›®å½•æ•°æ®å¤±è´¥\n");
             free_allocated_block(new_block);
             return -1;
         }
@@ -451,10 +334,10 @@ int create_entry(const char* path, int is_dir, int permission) {
         new_node.block_address[0] = new_block;
     }
 
-    // Ğ´Èëinode±í
+    // å†™å…¥inodeè¡¨
     FILE* fp = fopen(DEV_NAME, "r+b");
     if (!fp) {
-        //printf("DEBUG: ÎŞ·¨´ò¿ª´ÅÅÌÎÄ¼şÓÃÓÚĞ´Èëinode\n");
+        //printf("DEBUG: æ— æ³•æ‰“å¼€ç£ç›˜æ–‡ä»¶ç”¨äºå†™å…¥inode\n");
         if (is_dir && new_node.block_address[0] != 0) {
             free_allocated_block(new_node.block_address[0]);
         }
@@ -464,15 +347,15 @@ int create_entry(const char* path, int is_dir, int permission) {
     fseek(fp, INODE_START * BLOCK_SIZE + new_inode * sizeof(iNode), SEEK_SET);
     fwrite(&new_node, sizeof(iNode), 1, fp);
     fclose(fp);
-    //printf("DEBUG: Ğ´ÈëĞÂinode %d µ½´ÅÅÌ\n", new_inode);
+    //printf("DEBUG: å†™å…¥æ–°inode %d åˆ°ç£ç›˜\n", new_inode);
 
-    // ¸üĞÂ¸¸Ä¿Â¼
+    // æ›´æ–°çˆ¶ç›®å½•
     if (parent_dir.num_entries >= DIR_NUM) {
-        printf("DEBUG: ¸¸Ä¿Â¼ÒÑÂú (×î´óÌõÄ¿Êı: %d)\n", DIR_NUM);
+        printf("DEBUG: çˆ¶ç›®å½•å·²æ»¡ (æœ€å¤§æ¡ç›®æ•°: %d)\n", DIR_NUM);
         if (is_dir && new_node.block_address[0] != 0) {
             free_allocated_block(new_node.block_address[0]);
         }
-        // ÊÍ·Åinode (½«nlinksÉèÎª0)
+        // é‡Šæ”¾inode (å°†nlinksè®¾ä¸º0)
         new_node.nlinks = 0;
         fp = fopen(DEV_NAME, "r+b");
         if (fp) {
@@ -483,19 +366,19 @@ int create_entry(const char* path, int is_dir, int permission) {
         return -1;
     }
 
-    // Ìí¼ÓĞÂÌõÄ¿µ½¸¸Ä¿Â¼
+    // æ·»åŠ æ–°æ¡ç›®åˆ°çˆ¶ç›®å½•
     strncpy(parent_dir.entries[parent_dir.num_entries].name, name, Name_length - 1);
     parent_dir.entries[parent_dir.num_entries].name[Name_length - 1] = '\0';
     parent_dir.entries[parent_dir.num_entries].inode = new_inode;
     parent_dir.num_entries++;
 
-    // Ğ´»Ø¸¸Ä¿Â¼Êı¾İ
+    // å†™å›çˆ¶ç›®å½•æ•°æ®
     if (!block_write(parent_node.block_address[0], (char*)&parent_dir)) {
-        //printf("DEBUG: ÎŞ·¨¸üĞÂ¸¸Ä¿Â¼Êı¾İ\n");
+        //printf("DEBUG: æ— æ³•æ›´æ–°çˆ¶ç›®å½•æ•°æ®\n");
         if (is_dir && new_node.block_address[0] != 0) {
             free_allocated_block(new_node.block_address[0]);
         }
-        // ÊÍ·Åinode
+        // é‡Šæ”¾inode
         new_node.nlinks = 0;
         fp = fopen(DEV_NAME, "r+b");
         if (fp) {
@@ -505,9 +388,9 @@ int create_entry(const char* path, int is_dir, int permission) {
         }
         return -1;
     }
-    //printf("DEBUG: ¸üĞÂ¸¸Ä¿Â¼£¬Ìí¼ÓÌõÄ¿: %s -> inode %d\n", name, new_inode);
+    //printf("DEBUG: æ›´æ–°çˆ¶ç›®å½•ï¼Œæ·»åŠ æ¡ç›®: %s -> inode %d\n", name, new_inode);
 
-    // ¸üĞÂ¸¸Ä¿Â¼ÔªÊı¾İ
+    // æ›´æ–°çˆ¶ç›®å½•å…ƒæ•°æ®
     //parent_node.mtime = time(NULL);
     fp = fopen(DEV_NAME, "r+b");
     if (fp) {
@@ -515,49 +398,50 @@ int create_entry(const char* path, int is_dir, int permission) {
         fwrite(&parent_node, sizeof(iNode), 1, fp);
         fclose(fp);
     }
-    //printf("DEBUG: ÌõÄ¿´´½¨³É¹¦: %s, inode: %d\n", path, new_inode);
+    //printf("DEBUG: æ¡ç›®åˆ›å»ºæˆåŠŸ: %s, inode: %d\n", path, new_inode);
 
     return new_inode;
 }
 
+//åˆ é™¤æ–‡ä»¶/ç›®å½•
 int delete_entry(const char* path) {
-    // ½âÎöÂ·¾¶£¬·ÖÀë¸¸Ä¿Â¼ºÍÎÄ¼şÃû
+    // è§£æè·¯å¾„ï¼Œåˆ†ç¦»çˆ¶ç›®å½•å’Œæ–‡ä»¶å
     char parent_path[PATH_LENGTH] = { 0 };
     char name[Name_length] = { 0 };
     const char* last_slash = strrchr(path, '/');
 
-    // ´¦Àí¸ùÄ¿Â¼ÌØÊâÇé¿ö
+    // å¤„ç†æ ¹ç›®å½•ç‰¹æ®Šæƒ…å†µ
     if (strlen(path) == 1 && path[0] == '/') {
-        printf("²»ÄÜÉ¾³ı¸ùÄ¿Â¼\n");
+        printf("ä¸èƒ½åˆ é™¤æ ¹ç›®å½•\n");
         return -1;
     }
 
-    // ÌáÈ¡¸¸Ä¿Â¼Â·¾¶ºÍÎÄ¼şÃû
-    if (last_slash == path) { // ÀıÈçÂ·¾¶Îª "/file"
+    // æå–çˆ¶ç›®å½•è·¯å¾„å’Œæ–‡ä»¶å
+    if (last_slash == path) { // ä¾‹å¦‚è·¯å¾„ä¸º "/file"
         strcpy(parent_path, "/");
         strncpy(name, path + 1, Name_length - 1);
     }
     else {
         strncpy(parent_path, path, last_slash - path);
-        parent_path[last_slash - path] = '\0';
+        parent_path[last_slash - path] = '\0';//ç»ˆæ­¢ç¬¦
         strncpy(name, last_slash + 1, Name_length - 1);
     }
     name[Name_length - 1] = '\0';
 
-    // »ñÈ¡¸¸Ä¿Â¼inode
+    // è·å–çˆ¶ç›®å½•inode
     int parent_inode_num;
     if (resolve_path(parent_path, &parent_inode_num) != 0) {
-        printf("¸¸Ä¿Â¼²»´æÔÚ: %s\n", parent_path);
+        printf("çˆ¶ç›®å½•ä¸å­˜åœ¨: %s\n", parent_path);
         return -1;
     }
 
-    // ¶ÁÈ¡¸¸Ä¿Â¼Êı¾İ
+    // è¯»å–çˆ¶ç›®å½•æ•°æ®
     iNode parent_inode;
     directory parent_dir;
     get_inode(parent_inode_num, &parent_inode);
     block_read(parent_inode.block_address[0], (char*)&parent_dir);
 
-    // ÔÚ¸¸Ä¿Â¼ÖĞ²éÕÒÄ¿±êÌõÄ¿
+    // åœ¨çˆ¶ç›®å½•ä¸­æŸ¥æ‰¾ç›®æ ‡æ¡ç›®
     int target_index = -1;
     int target_inode_num = -1;
     for (int i = 0; i < parent_dir.num_entries; i++) {
@@ -569,29 +453,29 @@ int delete_entry(const char* path) {
     }
 
     if (target_index == -1) {
-        printf("Ä¿±ê²»´æÔÚ: %s\n", name);
+        printf("ç›®æ ‡ä¸å­˜åœ¨: %s\n", name);
         return -1;
     }
 
-    // »ñÈ¡Ä¿±êinode
+    // è·å–ç›®æ ‡inode
     iNode target_inode;
     get_inode(target_inode_num, &target_inode);
 
-    // ¼ì²éÊÇ·ñÎªÄ¿Â¼ÇÒ·Ç¿Õ
-    if (target_inode.i_mode == 0) { // Ä¿Â¼
+    // æ£€æŸ¥æ˜¯å¦ä¸ºç›®å½•ä¸”éç©º
+    if (target_inode.i_mode == 0) { // ç›®å½•
         directory target_dir;
         block_read(target_inode.block_address[0], (char*)&target_dir);
         if (target_dir.num_entries > 0) {
-            printf("Ä¿Â¼·Ç¿Õ£¬ÎŞ·¨É¾³ı\n");
+            printf("ç›®å½•éç©ºï¼Œæ— æ³•åˆ é™¤\n");
             return -1;
         }
     }
 
-    // ÊÍ·ÅÄ¿±êµÄÊı¾İ¿é
-    if (target_inode.i_mode == 0) { // Ä¿Â¼£¬ÊÍ·ÅÆäÊı¾İ¿é
+    // é‡Šæ”¾ç›®æ ‡çš„æ•°æ®å—
+    if (target_inode.i_mode == 0) { // ç›®å½•ï¼Œé‡Šæ”¾å…¶æ•°æ®å—
         free_allocated_block(target_inode.block_address[0]);
     }
-    else { // ÎÄ¼ş£¬ÊÍ·ÅËùÓĞÊı¾İ¿é
+    else { // æ–‡ä»¶ï¼Œé‡Šæ”¾æ‰€æœ‰æ•°æ®å—
         for (int i = 0; i < FBLK_NUM; i++) {
             if (target_inode.block_address[i] != 0) {
                 free_allocated_block(target_inode.block_address[i]);
@@ -599,24 +483,24 @@ int delete_entry(const char* path) {
         }
     }
 
-    // ÊÍ·ÅÄ¿±êinode
+    // é‡Šæ”¾ç›®æ ‡inode
     target_inode.nlinks = 0;
-    // ½«Ä¿±êinodeĞ´»Ø´ÅÅÌ
+    // å°†ç›®æ ‡inodeå†™å›ç£ç›˜
     FILE* fp = fopen(DEV_NAME, "r+b");
     fseek(fp, INODE_START * BLOCK_SIZE + target_inode_num * sizeof(iNode), SEEK_SET);
     fwrite(&target_inode, sizeof(iNode), 1, fp);
     fclose(fp);
 
-    // ´Ó¸¸Ä¿Â¼ÖĞÉ¾³ıÌõÄ¿
+    // ä»çˆ¶ç›®å½•ä¸­åˆ é™¤æ¡ç›®
     for (int i = target_index; i < parent_dir.num_entries - 1; i++) {
         parent_dir.entries[i] = parent_dir.entries[i + 1];
     }
     parent_dir.num_entries--;
 
-    // ¸üĞÂ¸¸Ä¿Â¼Êı¾İ
+    // æ›´æ–°çˆ¶ç›®å½•æ•°æ®
     block_write(parent_inode.block_address[0], (char*)&parent_dir);
 
-    // ¸üĞÂ¸¸Ä¿Â¼µÄmtime
+    // æ›´æ–°çˆ¶ç›®å½•çš„mtime
     //parent_inode.mtime = time(NULL);
     fp = fopen(DEV_NAME, "r+b");
     fseek(fp, INODE_START * BLOCK_SIZE + parent_inode_num * sizeof(iNode), SEEK_SET);
@@ -626,21 +510,137 @@ int delete_entry(const char* path) {
     return 0;
 }
 
+// è·¯å¾„è§£æå‡½æ•°ï¼šä»æ ¹ç›®å½•å¼€å§‹ï¼Œä¾æ¬¡è§£æè·¯å¾„ä¸­çš„å„ä¸ªç›®å½•ï¼ˆä»¥'/'åˆ†éš”ï¼‰ï¼Œè¿”å›ç›®æ ‡æ–‡ä»¶æˆ–ç›®å½•å¯¹åº”çš„inodeç¼–å·ã€‚
+int resolve_path(const char* path, int* inode_num_out) {
+    //printf("DEBUG: è§£æè·¯å¾„: %s\n", path);
+
+    // æ£€æŸ¥è¾“å…¥å‚æ•°
+    if (!path || !inode_num_out) {
+        //printf("DEBUG: æ— æ•ˆçš„è¾“å…¥å‚æ•°\n");
+        return -1;
+    }
+
+    // å¤„ç†æ ¹ç›®å½•æƒ…å†µ
+    if (path[0] == '/' && strlen(path) == 1) {
+        //printf("DEBUG: è¿”å›æ ¹ç›®å½•inode 0\n");
+        *inode_num_out = 0; // æ ¹ç›®å½•inode
+        return 0;
+    }
+
+    char path_copy[PATH_LENGTH];
+    strncpy(path_copy, path, PATH_LENGTH - 1);
+    path_copy[PATH_LENGTH - 1] = '\0';
+
+    // ç¡®ä¿è·¯å¾„ä»¥'/'å¼€å¤´
+    if (path_copy[0] != '/') {
+        printf("DEBUG: æ— æ•ˆè·¯å¾„: å¿…é¡»ä»¥'/'å¼€å¤´\n");
+        return -1;
+    }
+
+    // ä»æ ¹ç›®å½•å¼€å§‹
+    int current_inode_num = 0;
+    iNode current_inode;
+    if (get_inode(current_inode_num, &current_inode) < 0) {
+        printf("DEBUG: è·å–æ ¹ç›®å½•inodeå¤±è´¥\n");
+        return -1;
+    }
+
+    // è·³è¿‡è·¯å¾„å¼€å¤´çš„'/'
+    char* path_ptr = path_copy + 1;
+
+    // å¦‚æœè·¯å¾„ä¸ºç©º(åªæœ‰ä¸€ä¸ª'/')
+    if (*path_ptr == '\0') {
+        *inode_num_out = current_inode_num;
+        return 0;
+    }
+
+    char component[Name_length];
+    char* next_slash;
+
+    // é€çº§è§£æè·¯å¾„
+    while (*path_ptr) {
+        // æå–å½“å‰è·¯å¾„ç»„ä»¶
+        next_slash = strchr(path_ptr, '/');//æŸ¥æ‰¾ä¸‹ä¸ª'/'
+        if (next_slash) {
+            int len = next_slash - path_ptr;
+            if (len >= Name_length) len = Name_length - 1;
+            strncpy(component, path_ptr, len);
+            component[len] = '\0';//æ‰¾åˆ°ç›®å½•åç§°
+            path_ptr = next_slash + 1;
+        }
+        else {
+            strncpy(component, path_ptr, Name_length - 1);
+            component[Name_length - 1] = '\0';
+            path_ptr += strlen(path_ptr);
+        }
+
+        //printf("DEBUG: å½“å‰è§£æç»„ä»¶: '%s', å½“å‰inode: %d\n", component, current_inode_num);
+
+        // è·³è¿‡ç©ºç»„ä»¶
+        if (strlen(component) == 0) {
+            continue;
+        }
+
+        // ç¡®ä¿å½“å‰èŠ‚ç‚¹æ˜¯ç›®å½•
+        if (current_inode.i_mode != 0) {
+            printf("DEBUG: é”™è¯¯: inode %d ä¸æ˜¯ç›®å½•\n", current_inode_num);
+            return -1;
+        }
+
+        // è¯»å–ç›®å½•å†…å®¹
+        directory dir;
+        if (!block_read(current_inode.block_address[0], (char*)&dir)) {
+            printf("DEBUG: æ— æ³•è¯»å–ç›®å½•å†…å®¹, inode: %d, å—: %d\n",
+                current_inode_num, current_inode.block_address[0]);
+            return -1;
+        }
+
+        // åœ¨ç›®å½•ä¸­æŸ¥æ‰¾ç»„ä»¶
+        int found = 0;
+        for (int i = 0; i < dir.num_entries; i++) {
+            //printf("DEBUG: æ£€æŸ¥æ¡ç›® %d: '%s'\n", i, dir.entries[i].name);
+            if (strncmp(dir.entries[i].name, component, Name_length) == 0) {
+                current_inode_num = dir.entries[i].inode;
+                found = 1;
+                //printf("DEBUG: æ‰¾åˆ°åŒ¹é…! æ–°inode: %d\n", current_inode_num);
+
+                // è·å–æ–°inodeä¿¡æ¯
+                if (get_inode(current_inode_num, &current_inode) < 0) {
+                    //printf("DEBUG: æ— æ³•è·å–inode %d\n", current_inode_num);
+                    return -1;
+                }
+                break;
+            }
+        }
+
+        if (!found) {
+            //printf("DEBUG: æœªæ‰¾åˆ°è·¯å¾„ç»„ä»¶ '%s'\n", component);
+            return -1;
+        }
+    }
+
+    // æˆåŠŸæ‰¾åˆ°è·¯å¾„å¯¹åº”çš„inode
+    *inode_num_out = current_inode_num;
+    //printf("DEBUG: æˆåŠŸè§£æè·¯å¾„ '%s' åˆ°inode %d\n", path, current_inode_num);
+    return 0;
+}
+
+//æ‰“å°å½“å‰ç›®å½•å†…å®¹
 void dir_ls(int inode_num) {
     iNode node;
     directory dir;
 
     get_inode(inode_num, &node);
     if (node.i_mode != 0) {
-        printf("´íÎó£ºinode %d ²»ÊÇÄ¿Â¼\n", inode_num);
+        printf("é”™è¯¯ï¼šinode %d ä¸æ˜¯ç›®å½•\n", inode_num);
         return;
     }
 
     block_read(node.block_address[0], (char*)&dir);
 
-    printf("\n===== Ä¿Â¼ [inode %d] =====\n", inode_num);
-    printf("ÀàĞÍ: %-6s  ´óĞ¡: %-2dB  ÌõÄ¿Êı: %d/%d\n",
-        node.i_mode ? "ÎÄ¼ş" : "Ä¿Â¼",
+    printf("\n===== ç›®å½• [inode %d] =====\n", inode_num);
+    printf("ç±»å‹: %-6s  å¤§å°: %-2dB  æ¡ç›®æ•°: %d/%d\n",
+        node.i_mode ? "æ–‡ä»¶" : "ç›®å½•",
         node.i_size,
         dir.num_entries, DIR_NUM);
     printf("--------------------------\n");
@@ -653,53 +653,59 @@ void dir_ls(int inode_num) {
     printf("==========================\n\n");
 }
 
-// ´ò¿ªÎÄ¼ş£¬·µ»ØÎÄ¼ş¾ä±ú
+// æ‰“å¼€æ–‡ä»¶ï¼Œè¿”å›æ–‡ä»¶å¥æŸ„
 OS_FILE* Open_File(const char* path, int mode) {
     int inode_num;
-    //printf("³¢ÊÔ´ò¿ªÎÄ¼ş: %s\n", path);
+    //printf("å°è¯•æ‰“å¼€æ–‡ä»¶: %s\n", path);
 
     if (resolve_path(path, &inode_num) != 0) {
-        printf("ÎÄ¼ş²»´æÔÚ: %s\n", path);
+        printf("æ–‡ä»¶ä¸å­˜åœ¨: %s\n", path);
         return NULL;
     }
 
-    //printf("ÎÄ¼şinode±àºÅ: %d\n", inode_num);
+    //printf("æ–‡ä»¶inodeç¼–å·: %d\n", inode_num);
 
-    // ·ÖÅäÎÄ¼ş¾ä±úÄÚ´æ
+    // åˆ†é…æ–‡ä»¶å¥æŸ„å†…å­˜
     OS_FILE* file = (OS_FILE*)malloc(sizeof(OS_FILE));
     if (!file) {
-        perror("ÄÚ´æ·ÖÅäÊ§°Ü");
+        perror("å†…å­˜åˆ†é…å¤±è´¥");
         return NULL;
     }
 
-    // ³õÊ¼»¯ÎªÁã£¬±ÜÃâÇ±ÔÚÎÊÌâ
+    // åˆå§‹åŒ–ä¸ºé›¶ï¼Œé¿å…æ½œåœ¨é—®é¢˜
     memset(file, 0, sizeof(OS_FILE));
 
-    // ·ÖÅäiNodeÄÚ´æ²¢¶ÁÈ¡iNode
+    // åˆ†é…iNodeå†…å­˜å¹¶è¯»å–iNode
     file->f_iNode = (iNode*)malloc(sizeof(iNode));
     file->f_inode_num = inode_num;
     if (!file->f_iNode) {
-        perror("ÄÚ´æ·ÖÅäÊ§°Ü");
+        perror("å†…å­˜åˆ†é…å¤±è´¥");
         free(file);
         return NULL;
     }
 
-    // ³õÊ¼»¯ÎªÁã
+    // åˆå§‹åŒ–ä¸ºé›¶
     memset(file->f_iNode, 0, sizeof(iNode));
 
     if (get_inode(inode_num, file->f_iNode) < 0) {
-        printf("ÎŞ·¨¶ÁÈ¡iNode %d\n", inode_num);
+        printf("æ— æ³•è¯»å–iNode %d\n", inode_num);
         free(file->f_iNode);
         free(file);
         return NULL;
     }
-    file->f_pos = 0;  // ³õÊ¼Î»ÖÃ
+
+    if (mode & RDWR) {  
+        file->f_pos = file->f_iNode->i_size; // æŒ‡é’ˆæŒ‡å‘æ–‡ä»¶æœ«å°¾
+    }
+    else {             // è¦†ç›–æ¨¡å¼
+        file->f_pos = 0; // ä»å¤´å¼€å§‹
+    }
     file->f_mode = mode;
 
-    // Ôö¼Ó´ò¿ªÊıÁ¿
+    // å¢åŠ æ‰“å¼€æ•°é‡
     file->f_iNode->open_num++;
 
-    // ½«¸üĞÂºóµÄiNodeĞ´»Ø´ÅÅÌ
+    // å°†æ›´æ–°åçš„iNodeå†™å›ç£ç›˜
     FILE* fp = fopen(DEV_NAME, "r+b");
     if (fp) {
         fseek(fp, INODE_START * BLOCK_SIZE + inode_num * sizeof(iNode), SEEK_SET);
@@ -707,72 +713,72 @@ OS_FILE* Open_File(const char* path, int mode) {
         fclose(fp);
     }
     else {
-        perror("ÎŞ·¨¸üĞÂinodeĞÅÏ¢");
-        // ¼ÌĞøÖ´ĞĞ£¬²»·µ»Ø´íÎó
+        perror("æ— æ³•æ›´æ–°inodeä¿¡æ¯");
+        // ç»§ç»­æ‰§è¡Œï¼Œä¸è¿”å›é”™è¯¯
     }
 
-    //printf("ÎÄ¼ş³É¹¦´ò¿ª\n");
+    //printf("æ–‡ä»¶æˆåŠŸæ‰“å¼€\n");
     return file;
 }
 
-// Ğ´ÈëÎÄ¼şÊı¾İ
+// å†™å…¥æ–‡ä»¶æ•°æ®
 int file_write(OS_FILE* f, const char* data, int len) {
     if (!f || !f->f_iNode) {
-        printf("ÎŞĞ§µÄÎÄ¼ş¾ä±ú\n");
+        printf("æ— æ•ˆçš„æ–‡ä»¶å¥æŸ„\n");
         return -1;
     }
 
-    // ¼ì²éĞ´È¨ÏŞ
+    // æ£€æŸ¥å†™æƒé™
     //if (!(f->f_mode & WRONLY) && !(f->f_mode & RDWR)) {
-    //    printf("ÎŞĞ´ÈëÈ¨ÏŞ\n");
+    //    printf("æ— å†™å…¥æƒé™\n");
     //    return -1;
     //}
 
-    // ¼ì²éÊÇ·ñÎªÄ¿Â¼
+    // æ£€æŸ¥æ˜¯å¦ä¸ºç›®å½•
     if (f->f_iNode->i_mode == 0) {
-        printf("²»ÄÜ¶ÔÄ¿Â¼½øĞĞĞ´²Ù×÷\n");
+        printf("ä¸èƒ½å¯¹ç›®å½•è¿›è¡Œå†™æ“ä½œ\n");
         return -1;
     }
 
-    // ¼ÆËãĞèÒªĞ´ÈëµÄ×Ü³¤¶È
+    // è®¡ç®—éœ€è¦å†™å…¥çš„æ€»é•¿åº¦
     int total_size = f->f_pos + len;
     if (total_size > MAX_FILE_SIZE) {
-        printf("³¬³ö×î´óÎÄ¼ş´óĞ¡\n");
+        printf("è¶…å‡ºæœ€å¤§æ–‡ä»¶å¤§å°\n");
         return -1;
     }
 
-    // ¼ÆËãĞèÒªµÄ¿éÊı
+    // è®¡ç®—éœ€è¦çš„å—æ•°
     int current_blocks = (f->f_iNode->i_size + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int needed_blocks = (total_size + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-    // Èç¹ûĞèÒª·ÖÅä¸ü¶à¿é
+    // å¦‚æœéœ€è¦åˆ†é…æ›´å¤šå—
     for (int i = current_blocks; i < needed_blocks && i < FBLK_NUM; i++) {
         int new_block = alloc_first_free_block();
         if (new_block == -1) {
-            printf("´ÅÅÌ¿Õ¼ä²»×ã\n");
+            printf("ç£ç›˜ç©ºé—´ä¸è¶³\n");
             return -1;
         }
         f->f_iNode->block_address[i] = new_block;
     }
 
-    // Êµ¼ÊĞ´ÈëÊı¾İ
+    // å®é™…å†™å…¥æ•°æ®
     int bytes_written = 0;
     int remaining = len;
 
     while (remaining > 0 && bytes_written < len) {
-        // ¼ÆËãµ±Ç°¿éºÍ¿éÄÚÆ«ÒÆ
+        // è®¡ç®—å½“å‰å—å’Œå—å†…åç§»
         int current_block_index = f->f_pos / BLOCK_SIZE;
         int offset_in_block = f->f_pos % BLOCK_SIZE;
 
-        // ¼ì²é¿éË÷ÒıÊÇ·ñÓĞĞ§
+        // æ£€æŸ¥å—ç´¢å¼•æ˜¯å¦æœ‰æ•ˆ
         if (current_block_index >= FBLK_NUM) {
             break;
         }
 
-        // »ñÈ¡¿éµØÖ·
+        // è·å–å—åœ°å€
         int block_address = f->f_iNode->block_address[current_block_index];
         if (block_address == 0) {
-            // ·ÖÅäĞÂ¿é
+            // åˆ†é…æ–°å—
             block_address = alloc_first_free_block();
             if (block_address == -1) {
                 break;
@@ -780,37 +786,37 @@ int file_write(OS_FILE* f, const char* data, int len) {
             f->f_iNode->block_address[current_block_index] = block_address;
         }
 
-        // ¶ÁÈ¡µ±Ç°¿é
+        // è¯»å–å½“å‰å—
         char block_data[BLOCK_SIZE] = { 0 };
         block_read(block_address, block_data);
 
-        // ¼ÆËã±¾´ÎĞ´Èë´óĞ¡
+        // è®¡ç®—æœ¬æ¬¡å†™å…¥å¤§å°
         int bytes_to_write = BLOCK_SIZE - offset_in_block;
         if (bytes_to_write > remaining) {
             bytes_to_write = remaining;
         }
 
-        // ¸´ÖÆÊı¾İµ½¿é
+        // å¤åˆ¶æ•°æ®åˆ°å—
         memcpy(block_data + offset_in_block, data + bytes_written, bytes_to_write);
 
-        // Ğ´»Ø¿é
+        // å†™å›å—
         block_write(block_address, block_data);
 
-        // ¸üĞÂ¼ÆÊı
+        // æ›´æ–°è®¡æ•°
         bytes_written += bytes_to_write;
         remaining -= bytes_to_write;
         f->f_pos += bytes_to_write;
     }
 
-    // ¸üĞÂÎÄ¼ş´óĞ¡
+    // æ›´æ–°æ–‡ä»¶å¤§å°
     if (f->f_pos > f->f_iNode->i_size) {
         f->f_iNode->i_size = f->f_pos;
     }
 
-    // ¸üĞÂĞŞ¸ÄÊ±¼ä
+    // æ›´æ–°ä¿®æ”¹æ—¶é—´
     //f->f_iNode->mtime = time(NULL);
 
-    // ½«¸üĞÂºóµÄiNodeĞ´»Ø´ÅÅÌ
+    // å°†æ›´æ–°åçš„iNodeå†™å›ç£ç›˜
     FILE* fp = fopen(DEV_NAME, "r+b");
     if (fp) {
         fseek(fp, INODE_START * BLOCK_SIZE + f->f_inode_num * sizeof(iNode), SEEK_SET);
@@ -821,28 +827,28 @@ int file_write(OS_FILE* f, const char* data, int len) {
     return bytes_written;
 }
 
-// ¶ÁÈ¡ÎÄ¼şÊı¾İ
+// è¯»å–æ–‡ä»¶æ•°æ®
 int file_read(OS_FILE* f, char* buf, int len) {
     if (!f || !f->f_iNode) {
-        printf("ÎŞĞ§µÄÎÄ¼ş¾ä±ú\n");
+        printf("æ— æ•ˆçš„æ–‡ä»¶å¥æŸ„\n");
         return -1;
     }
 
-    // ¼ì²é¶ÁÈ¨ÏŞ
+    // æ£€æŸ¥è¯»æƒé™
     //if (!(f->f_mode & RDONLY) && !(f->f_mode & RDWR)) {
-    //  printf("ÎŞ¶ÁÈ¡È¨ÏŞ\n");
+    //  printf("æ— è¯»å–æƒé™\n");
     //  return -1;
     //}
 
-    // ¼ì²éÊÇ·ñÎªÄ¿Â¼
+    // æ£€æŸ¥æ˜¯å¦ä¸ºç›®å½•
     if (f->f_iNode->i_mode == 0) {
-        printf("²»ÄÜ¶ÔÄ¿Â¼½øĞĞ¶Á²Ù×÷\n");
+        printf("ä¸èƒ½å¯¹ç›®å½•è¿›è¡Œè¯»æ“ä½œ\n");
         return -1;
     }
 
-    // µ÷Õû¶ÁÈ¡³¤¶È£¬È·±£²»³¬¹ıÎÄ¼şÄ©Î²
+    // è°ƒæ•´è¯»å–é•¿åº¦ï¼Œç¡®ä¿ä¸è¶…è¿‡æ–‡ä»¶æœ«å°¾
     if (f->f_pos >= f->f_iNode->i_size) {
-        return 0;  // ÒÑµ½´ïÎÄ¼şÄ©Î²
+        return 0;  // å·²åˆ°è¾¾æ–‡ä»¶æœ«å°¾
     }
 
     if (f->f_pos + len > f->f_iNode->i_size) {
@@ -852,55 +858,55 @@ int file_read(OS_FILE* f, char* buf, int len) {
     int bytes_read = 0;
     int remaining = len;
 
-    // °´¿é¶ÁÈ¡Êı¾İ
+    // æŒ‰å—è¯»å–æ•°æ®
     while (remaining > 0 && bytes_read < len) {
-        // ¼ÆËãµ±Ç°¿éºÍ¿éÄÚÆ«ÒÆ
+        // è®¡ç®—å½“å‰å—å’Œå—å†…åç§»
         int current_block_index = f->f_pos / BLOCK_SIZE;
         int offset_in_block = f->f_pos % BLOCK_SIZE;
 
-        // ¼ì²é¿éË÷ÒıÊÇ·ñÓĞĞ§
+        // æ£€æŸ¥å—ç´¢å¼•æ˜¯å¦æœ‰æ•ˆ
         if (current_block_index >= FBLK_NUM) {
             break;
         }
 
-        // »ñÈ¡¿éµØÖ·
+        // è·å–å—åœ°å€
         int block_address = f->f_iNode->block_address[current_block_index];
         if (block_address == 0) {
-            break;  // Ã»ÓĞ·ÖÅäµÄ¿é
+            break;  // æ²¡æœ‰åˆ†é…çš„å—
         }
 
-        // ¶ÁÈ¡µ±Ç°¿é
+        // è¯»å–å½“å‰å—
         char block_data[BLOCK_SIZE] = { 0 };
         block_read(block_address, block_data);
 
-        // ¼ÆËã±¾´Î¶ÁÈ¡´óĞ¡
+        // è®¡ç®—æœ¬æ¬¡è¯»å–å¤§å°
         int bytes_to_read = BLOCK_SIZE - offset_in_block;
         if (bytes_to_read > remaining) {
             bytes_to_read = remaining;
         }
 
-        // ¸´ÖÆÊı¾İµ½ÓÃ»§»º³åÇø
+        // å¤åˆ¶æ•°æ®åˆ°ç”¨æˆ·ç¼“å†²åŒº
         memcpy(buf + bytes_read, block_data + offset_in_block, bytes_to_read);
 
-        // ¸üĞÂ¼ÆÊı
+        // æ›´æ–°è®¡æ•°
         bytes_read += bytes_to_read;
-        remaining -= bytes_to_read;
+        remaining -= bytes_to_read; 
         f->f_pos += bytes_to_read;
     }
 
     return bytes_read;
 }
 
-// ¹Ø±ÕÎÄ¼ş
+// å…³é—­æ–‡ä»¶
 void Close_File(OS_FILE* f) {
     if (!f || !f->f_iNode) {
         return;
     }
 
-    // ¼õÉÙ´ò¿ªÊıÁ¿
+    // å‡å°‘æ‰“å¼€æ•°é‡
     f->f_iNode->open_num--;
 
-    // ½«¸üĞÂºóµÄiNodeĞ´»Ø´ÅÅÌ
+    // å°†æ›´æ–°åçš„iNodeå†™å›ç£ç›˜
     FILE* fp = fopen(DEV_NAME, "r+b");
     if (fp) {
         fseek(fp, INODE_START * BLOCK_SIZE + f->f_inode_num * sizeof(iNode), SEEK_SET);
@@ -908,7 +914,8 @@ void Close_File(OS_FILE* f) {
         fclose(fp);
     }
 
-    // ÊÍ·Å×ÊÔ´
+    // é‡Šæ”¾èµ„æº
     free(f->f_iNode);
     free(f);
 }
+

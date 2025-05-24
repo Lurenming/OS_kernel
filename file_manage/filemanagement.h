@@ -5,64 +5,63 @@
 #include <time.h>
 
 
-#define BLOCK_SIZE 64          // Êı¾İ¿é64×Ö½Ú
-#define MAX_FILE_SIZE 256      // ×î´óÎÄ¼ş³¤¶È
-#define MAX_FILE_NUM 256       // ×î´óÎÄ¼şÊıÁ¿
-#define MAX_BLOCK 1024         // ´ÅÅÌ¿é×ÜÊı
-#define INODE_START 1          // inodeÇøÆğÊ¼¿éºÅ 
-#define BITMAP_START 129       // bitmapÇøÆğÊ¼¿éºÅ
-#define DATA_START (BITMAP_START + (sizeof(char)*MAX_BLOCK)/BLOCK_SIZE) // dataÇøÆğÊ¼¿éºÅ(145)
+#define BLOCK_SIZE 64          // æ•°æ®å—64å­—èŠ‚
+#define MAX_FILE_SIZE 256      // æœ€å¤§æ–‡ä»¶é•¿åº¦
+#define MAX_FILE_NUM 256       // æœ€å¤§æ–‡ä»¶æ•°é‡
+#define MAX_BLOCK 1024         // ç£ç›˜å—æ€»æ•°
+#define INODE_START 1          // inodeåŒºèµ·å§‹å—å· 
+#define BITMAP_START 129       // bitmapåŒºèµ·å§‹å—å·
+#define DATA_START (BITMAP_START + (sizeof(char)*MAX_BLOCK)/BLOCK_SIZE) // dataåŒºèµ·å§‹å—å·(145)
 #define DEV_NAME "disk.bin"
 
-#define Name_length 8         // ÎÄ¼şÃû³Æ×î´ó³¤¶È
-#define iNode_NUM 256          // iNodeµÄÊıÁ¿
-#define DIR_NUM 5             // Ã¿¸öÄ¿Â¼ÎÄ¼şÏÂµÄ×î´óÎÄ¼ş¸öÊı
-#define PATH_LENGTH 100        // Â·¾¶×Ö·û´®×î´ó³¤¶È
-#define FBLK_NUM 4             // Ã¿¸öÎÄ¼şiNodeÖĞ±£´æµÄ¿éºÅÊı
+#define Name_length 8         // æ–‡ä»¶åç§°æœ€å¤§é•¿åº¦
+#define iNode_NUM 256          // iNodeçš„æ•°é‡
+#define DIR_NUM 5             // æ¯ä¸ªç›®å½•æ–‡ä»¶ä¸‹çš„æœ€å¤§æ–‡ä»¶ä¸ªæ•°
+#define PATH_LENGTH 100        // è·¯å¾„å­—ç¬¦ä¸²æœ€å¤§é•¿åº¦
+#define FBLK_NUM 4             // æ¯ä¸ªæ–‡ä»¶iNodeä¸­ä¿å­˜çš„å—å·æ•°
 
-#define RDONLY 00 //Ö»¶Á
-#define WRONLY 01 //Ö»Ğ´
-#define RDWR 02   //¶ÁĞ´
+#define RDONLY 00 //åªè¯»
+#define WRONLY 01 //åªå†™
+#define RDWR 02   //è¯»å†™
+//----------------ç£ç›˜ç»“æ„å®šä¹‰----------------
 
-//----------------´ÅÅÌ½á¹¹¶¨Òå----------------
-
-// ³¬¼¶¿é½á¹¹Ìå
+// è¶…çº§å—ç»“æ„ä½“
 typedef struct super_block {
-    unsigned short inodeNum;    // ´ÅÅÌÖĞinode½ÚµãÊı
-    unsigned short blockNum;    // ´ÅÅÌÖĞµÄÎïÀí¿éÊı
-    unsigned long file_maxsize; // ÎÄ¼şµÄ×î´ó³¤¶È
+    unsigned short inodeNum;    // ç£ç›˜ä¸­inodeèŠ‚ç‚¹æ•°
+    unsigned short blockNum;    // ç£ç›˜ä¸­çš„ç‰©ç†å—æ•°
+    unsigned long file_maxsize; // æ–‡ä»¶çš„æœ€å¤§é•¿åº¦
 } super_block;
 
-// iNode½á¹¹Ìå£¨32×Ö½Ú£©
+// iNodeç»“æ„ä½“ï¼ˆ32å­—èŠ‚ï¼‰
 typedef struct INODE {
-    int i_mode;               // ÎÄ¼şÀàĞÍ£º0Ä¿Â¼£¬1ÆÕÍ¨ÎÄ¼ş
-    int i_size;               // ÎÄ¼ş´óĞ¡£¨×Ö½ÚÊı£©
-    //int permission;           // ÎÄ¼şµÄ¶Á¡¢Ğ´¡¢Ö´ĞĞÈ¨ÏŞ
-    //int ctime;                // ÎÄ¼şµÄÊ±¼ä´Á£¨ÔİÎ´´¦Àí£©
-    //int mtime;                // ÎÄ¼şµÄÊ±¼ä´Á£¨ÔİÎ´´¦Àí£©
-    int nlinks;               // Á´½ÓÊı£¨ÓĞ¶àÉÙÄ¿Â¼ÏîÖ¸Ïò¸Ãinode£©
-    int block_address[FBLK_NUM]; // ÎÄ¼şÊı¾İ¿éµÄµØÖ·Êı×é
-    int open_num;             // ´ò¿ª¼ÆÊı£¬0±íÊ¾Î´´ò¿ª£¬1±íÊ¾ÒÑ´ò¿ª
+    int i_mode;               // æ–‡ä»¶ç±»å‹ï¼š0ç›®å½•ï¼Œ1æ™®é€šæ–‡ä»¶
+    int i_size;               // æ–‡ä»¶å¤§å°ï¼ˆå­—èŠ‚æ•°ï¼‰
+    //int permission;           // æ–‡ä»¶çš„è¯»ã€å†™ã€æ‰§è¡Œæƒé™
+    //int ctime;                // æ–‡ä»¶çš„æ—¶é—´æˆ³ï¼ˆæš‚æœªå¤„ç†ï¼‰
+    //int mtime;                // æ–‡ä»¶çš„æ—¶é—´æˆ³ï¼ˆæš‚æœªå¤„ç†ï¼‰
+    int nlinks;               // é“¾æ¥æ•°ï¼ˆæœ‰å¤šå°‘ç›®å½•é¡¹æŒ‡å‘è¯¥inodeï¼‰
+    int block_address[FBLK_NUM]; // æ–‡ä»¶æ•°æ®å—çš„åœ°å€æ•°ç»„
+    int open_num;             // æ‰“å¼€è®¡æ•°ï¼Œ0è¡¨ç¤ºæœªæ‰“å¼€ï¼Œ1è¡¨ç¤ºå·²æ‰“å¼€
 } iNode;
 
-// Ä¿Â¼Ïî½á¹¹Ìå
+// ç›®å½•é¡¹ç»“æ„ä½“
 typedef struct dir_entry {
-    char name[Name_length];   // ÎÄ¼şÃû
-    int inode;                // ¹ØÁªµÄinode±àºÅ
+    char name[Name_length];   // æ–‡ä»¶å
+    int inode;                // å…³è”çš„inodeç¼–å·
 } dir_entry;
 
-// Ä¿Â¼½á¹¹Ìå
+// ç›®å½•ç»“æ„ä½“
 typedef struct directory {
-    int num_entries;          // µ±Ç°Ä¿Â¼ÏÂµÄÄ¿Â¼ÏîÊıÁ¿
-    dir_entry entries[DIR_NUM]; // Ä¿Â¼ÏîÊı×é
+    int num_entries;          // å½“å‰ç›®å½•ä¸‹çš„ç›®å½•é¡¹æ•°é‡
+    dir_entry entries[DIR_NUM]; // ç›®å½•é¡¹æ•°ç»„
 } directory;
 
-//ÎÄ¼ş¾ä±ú
+//æ–‡ä»¶å¥æŸ„
 typedef struct OS_FILE {
-    iNode* f_iNode;    // Ö¸Ïò¶ÔÓ¦µÄiNode
-    long f_pos;        // µ±Ç°ÎÄ¼şÖ¸ÕëÎ»ÖÃ
-    int f_mode;        // ´ò¿ªÄ£Ê½ (RDONLY/WRONLY/RDWR)
-    int f_inode_num;
+    iNode* f_iNode;    // æŒ‡å‘å¯¹åº”çš„iNode
+    long f_pos;        // å½“å‰æ–‡ä»¶æŒ‡é’ˆä½ç½®
+    int f_mode;        // æ‰“å¼€æ¨¡å¼ (RDONLY/WRONLY/RDWR)
+    int f_inode_num;   // inodeç¼–å·
 } OS_FILE;
 
 bool disk_format();
@@ -72,20 +71,21 @@ bool block_read(long block, char* buf);
 int alloc_first_free_block();
 int free_allocated_block(int block_num);
 int get_inode(int inode_num, iNode* inode);
-int find_free_inode();//ÕÒµ½Ò»¸ö¿ÕÏĞinode
+int find_free_inode();//æ‰¾åˆ°ä¸€ä¸ªç©ºé—²inode
 
 int resolve_path(const char* path, int* inode_num_out);
 int create_entry(const char* path, int is_dir, int permission);
 int delete_entry(const char* path);
+
 void dir_ls (inode_num);
 
-// ÎÄ¼ş¾ä±ú²Ù×÷
+// æ–‡ä»¶å¥æŸ„æ“ä½œ
 OS_FILE* Open_File(const char* path, int mode);
 int file_write(OS_FILE* f, const char* data, int len);
 int file_read(OS_FILE* f, char* buf, int len);
 void Close_File(OS_FILE* f);
 
-// ½»»¥º¯Êı
+// äº¤äº’å‡½æ•°
 void handle_mkdir(const char* path);
 void handle_touch(const char* path);
 void handle_rm(const char* path);
