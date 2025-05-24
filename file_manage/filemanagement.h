@@ -77,7 +77,7 @@ int resolve_path(const char* path, int* inode_num_out);
 int create_entry(const char* path, int is_dir, int permission);
 int delete_entry(const char* path);
 
-void dir_ls (inode_num);
+void dir_ls (int inode_num);
 
 // 文件句柄操作
 OS_FILE* Open_File(const char* path, int mode);
