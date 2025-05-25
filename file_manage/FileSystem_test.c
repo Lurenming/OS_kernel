@@ -94,7 +94,7 @@ int main() {
     }
     printf("文件系统初始化完成\n");
 
-    char input[256];
+    char input[360];
     print_help();
 
     while (1) {

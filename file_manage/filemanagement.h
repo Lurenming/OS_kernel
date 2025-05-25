@@ -5,7 +5,7 @@
 #include <time.h>
 
 
-#define BLOCK_SIZE 64          // 数据块64字节
+#define BLOCK_SIZE 84          // 数据块84字节
 #define MAX_FILE_SIZE 256      // 最大文件长度
 #define MAX_FILE_NUM 256       // 最大文件数量
 #define MAX_BLOCK 1024         // 磁盘块总数
@@ -14,7 +14,7 @@
 #define DATA_START (BITMAP_START + (sizeof(char)*MAX_BLOCK)/BLOCK_SIZE) // data区起始块号(145)
 #define DEV_NAME "disk.bin"
 
-#define Name_length 8         // 文件名称最大长度
+#define Name_length 12         // 文件名称最大长度
 #define iNode_NUM 256          // iNode的数量
 #define DIR_NUM 5             // 每个目录文件下的最大文件个数
 #define PATH_LENGTH 100        // 路径字符串最大长度
