@@ -11,7 +11,9 @@
 #define MAX_BLOCK 1024         // 磁盘块总数
 #define INODE_START 1          // inode区起始块号 
 #define BITMAP_START 129       // bitmap区起始块号
-#define DATA_START (BITMAP_START + (sizeof(char)*MAX_BLOCK)/BLOCK_SIZE) // data区起始块号(145)
+#define LOG_SIZE 108           // 日志区块数
+#define LOG_START (BITMAP_START + (sizeof(char)*MAX_BLOCK)/BLOCK_SIZE)  // 日志区起始块号
+#define DATA_START (BITMAP_START + (sizeof(char)*MAX_BLOCK)/BLOCK_SIZE + LOG_SIZE) // data区起始块号(145)
 #define DEV_NAME "disk.bin"
 
 #define Name_length 12         // 文件名称最大长度
@@ -77,7 +79,7 @@ int resolve_path(const char* path, int* inode_num_out);
 int create_entry(const char* path, int is_dir, int permission);
 int delete_entry(const char* path);
 
-void dir_ls (int inode_num);
+void dir_ls(int inode_num);
 
 // 文件句柄操作
 OS_FILE* Open_File(const char* path, int mode);

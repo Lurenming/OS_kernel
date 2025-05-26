@@ -1,31 +1,47 @@
 #include "filemanagement.h"
+#include "log.h"
 
 void handle_mkdir(const char* path) {
     int inode = create_entry(path, 1, 0755);
     if (inode == -1) {
-        printf("创建目录失败: %s\n", path);
+        printf("Mkdir failed %s\n", path);
+        log_write_disk(LOG_ERROR, __FILE__, __LINE__, "Create %s failed", path);
     }
     else {
-        printf("目录创建成功: %s\n", path);
+        printf("Mkdir succeeded %s\n", path);
+        log_write_disk(LOG_INFO, __FILE__, __LINE__, "Creating %s", path);
     }
+}
+
+void handle_log() {
+    log_display_all();
+}
+
+void handle_log_clear() {
+    log_clear_disk();
+    printf("Log cleared\n");
 }
 
 void handle_touch(const char* path) {
     int inode = create_entry(path, 0, 0644);
     if (inode == -1) {
-        printf("创建文件失败: %s\n", path);
+        printf("Fail to create a file: %s\n", path);
+        log_write_disk(LOG_ERROR, __FILE__, __LINE__, "Create %s failed", path);
     }
     else {
-        printf("文件创建成功: %s\n", path);
+        printf("Create a file successfully: %s\n", path);
+        log_write_disk(LOG_INFO, __FILE__, __LINE__, "Creating %s", path);
     }
 }
 
 void handle_rm(const char* path) {
     if (delete_entry(path) == -1) {
-        printf("删除失败: %s\n", path);
+        printf("Fail to delete: %s\n", path);
+        log_write_disk(LOG_ERROR, __FILE__, __LINE__, "Delete %s failed", path);
     }
     else {
-        printf("成功删除: %s\n", path);
+        printf("Delete successfully: %s\n", path);
+        log_write_disk(LOG_INFO, __FILE__, __LINE__, "Delete %s successfully", path);
     }
 }
 
@@ -33,123 +49,63 @@ void handle_ls(const char* path) {
     int inode_num;
     const char* target_path = path ? path : "/";
     if (resolve_path(target_path, &inode_num) != 0) {
-        printf("路径不存在: %s\n", target_path);
+        printf("Path not exists: %s\n", target_path);
+        log_write_disk(LOG_ERROR, __FILE__, __LINE__, "ls %s failed, path not exists", path);
         return;
     }
     dir_ls(inode_num);
+    log_write_disk(LOG_INFO, __FILE__, __LINE__, "ls %s", path);
 }
 
 void handle_write(const char* path, const char* data) {
     OS_FILE* f = Open_File(path, RDWR);
     if (!f) {
-        printf("无法打开文件: %s\n", path);
+        printf("Can't open the file: %s\n", path);
         return;
     }
     int written = file_write(f, data, strlen(data));
     Close_File(f);
     if (written < 0) {
-        printf("写入失败\n");
+        printf("Write failed\n");
+        log_write_disk(LOG_ERROR, __FILE__, __LINE__, "Write %s failed", path);
     }
     else {
-        printf("成功写入 %d 字节到 %s\n", written, path);
+        printf("Successfully write %d bytes to %s\n", written, path);
+        log_write_disk(LOG_INFO, __FILE__, __LINE__, "Write %d bytes to %s", written, path);
     }
+    log_write_disk(LOG_INFO, __FILE__, __LINE__, "Close file %s ", path);
 }
 
 void handle_read(const char* path) {
     OS_FILE* f = Open_File(path, RDONLY);
     if (!f) {
-        printf("无法打开文件: %s\n", path);
+        printf("Can't open the file: %s\n", path);
         return;
     }
     char buf[MAX_FILE_SIZE + 1] = { 0 };
     int read_bytes = file_read(f, buf, MAX_FILE_SIZE);
     Close_File(f);
     if (read_bytes < 0) {
-        printf("读取失败\n");
+        printf("Fail to read\n");
+        log_write_disk(LOG_ERROR, __FILE__, __LINE__, "Fail to Read %s ", path);
     }
     else {
-        printf("文件内容 (%d bytes):\n%.*s\n", read_bytes, read_bytes, buf);
+        printf("File's contents (%d bytes):\n%.*s\n", read_bytes, read_bytes, buf);
+        log_write_disk(LOG_INFO, __FILE__, __LINE__, "Read %s ", path);
     }
+    log_write_disk(LOG_INFO, __FILE__, __LINE__, "Close file %s ", path);
 }
 
 void print_help() {
-    printf("\n可用命令:\n");
+    printf("  Available commands:\n");
     //printf("  run       \运行进程\n")
-    printf("  mkdir <路径>       创建目录\n");
-    printf("  touch <路径>       创建文件\n");
-    printf("  rm <路径>          删除文件或目录\n");
-    printf("  ls [路径]          列出目录内容\n");
-    printf("  write <路径> <数据> 写入文件\n");
-    printf("  read <路径>        读取文件\n");
-    printf("  help              显示帮助信息\n");
-    printf("  exit              退出系统\n\n");
-}
-
-int main() {
-    // 初始化文件系统
-    printf("初始化文件系统...\n");
-    if (!disk_format() || !disk_init()) {
-        printf("初始化失败!\n");
-        return 1;
-    }
-    printf("文件系统初始化完成\n");
-
-    char input[360];
-    print_help();
-
-    while (1) {
-        printf("> ");
-        fflush(stdout);
-        if (!fgets(input, sizeof(input), stdin)) break;
-
-        // 去除换行符
-        input[strcspn(input, "\n")] = '\0';
-
-        // 分割命令和参数
-        char* cmd = strtok(input, " ");
-        if (!cmd) continue;
-
-        if (strcmp(cmd, "exit") == 0) {
-            break;
-        }
-        else if (strcmp(cmd, "help") == 0) {
-            print_help();
-        }
-        else if (strcmp(cmd, "mkdir") == 0) {
-            char* path = strtok(NULL, " ");
-            if (path) handle_mkdir(path);
-            else printf("用法: mkdir <绝对路径>\n");
-        }
-        else if (strcmp(cmd, "touch") == 0) {
-            char* path = strtok(NULL, " ");
-            if (path) handle_touch(path);
-            else printf("用法: touch <绝对路径>\n");
-        }
-        else if (strcmp(cmd, "rm") == 0) {
-            char* path = strtok(NULL, " ");
-            if (path) handle_rm(path);
-            else printf("用法: rm <绝对路径>\n");
-        }
-        else if (strcmp(cmd, "ls") == 0) {
-            char* path = strtok(NULL, " ");
-            handle_ls(path);
-        }
-        else if (strcmp(cmd, "write") == 0) {
-            char* path = strtok(NULL, " ");
-            char* data = strtok(NULL, "");
-            if (path && data) handle_write(path, data);
-            else printf("用法: write <绝对路径> <数据内容>\n");
-        }
-        else if (strcmp(cmd, "read") == 0) {
-            char* path = strtok(NULL, " ");
-            if (path) handle_read(path);
-            else printf("用法: read <绝对路径>\n");
-        }
-        else {
-            printf("未知命令: %s (输入help查看帮助)\n", cmd);
-        }
-    }
-
-    printf("\n文件系统退出\n");
-    return 0;
+    printf("  mkdir <Your path>                 Create a catalog \n");
+    printf("  touch <Your path>                 Create a file\n");
+    printf("  rm <Your path>                    Delete file or catalog\n");
+    printf("  ls <Your path>                    List contents of a catalog\n");
+    printf("  write <Your path> <Your data>     Write a file\n");
+    printf("  read <Your path>                  Read a file\n");
+    printf("  log                               Print the log\n");
+    printf("  help                              Show help information\n");
+    printf("  exit                              Quit system\n");
 }

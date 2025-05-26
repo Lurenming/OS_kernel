@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 #include "filemanagement.h"
+#include "log.h"
 //----------------磁盘操作函数----------------
 // 
 // 格式化磁盘：将磁盘文件写入0
@@ -12,7 +13,7 @@ bool disk_format() {
         fwrite(zero, BLOCK_SIZE, 1, fp);
     }
     fclose(fp);
-    printf("磁盘格式化完成\n");
+    printf("Disk formatting completed\n");
     return true;
 }
 
@@ -41,6 +42,8 @@ bool disk_init() {
     }
     bitmap[DATA_START] = 1;  // 根目录数据块标记为已使用
 
+    log_init_disk(); //初始化目录区
+
     fseek(fp, BITMAP_START * BLOCK_SIZE, SEEK_SET);
     fwrite(bitmap, MAX_BLOCK, 1, fp);
 
@@ -55,20 +58,20 @@ bool disk_init() {
     fwrite(&root_dir, sizeof(directory), 1, fp);
 
     fclose(fp);
-    printf("根目录已初始化\n");
+    printf("The root dir has been initialized\n");
     return true;
 }
 
 // 向指定磁盘块写入数据
 bool block_write(long block, char* buf) {
     if (block < 0 || block >= MAX_BLOCK) {
-        printf("无效的块号：%ld\n", block);
+        printf("Invalid block number：%ld\n", block);
         return false;
     }
 
     FILE* fp = fopen(DEV_NAME, "r+b");
     if (!fp) {
-        perror("块写入失败");
+        perror("Write block failed");
         return false;
     }
 
@@ -83,13 +86,13 @@ bool block_write(long block, char* buf) {
 // 从指定磁盘块读取数据
 bool block_read(long block, char* buf) {
     if (block < 0 || block >= MAX_BLOCK) {
-        printf("无效的块号：%ld\n", block);
+        printf("Invalid block number：%ld\n", block);
         return false;
     }
 
     FILE* fp = fopen(DEV_NAME, "rb");
     if (!fp) {
-        perror("块读取失败");
+        perror("Read block failed");
         return false;
     }
 
@@ -105,13 +108,13 @@ bool block_read(long block, char* buf) {
 int alloc_first_free_block() {
     FILE* fp = fopen(DEV_NAME, "rb+");
     if (!fp) {
-        perror("打开磁盘文件失败");
+        perror("Fail to open disk");
         return -1;
     }
 
     char* bitmap = (char*)malloc(MAX_BLOCK);
     if (!bitmap) {
-        perror("内存分配失败");
+        perror("Fail to allocate memory");
         fclose(fp);
         return -1;
     }
@@ -135,20 +138,20 @@ int alloc_first_free_block() {
 
     free(bitmap);
     fclose(fp);
-    printf("没有可用的磁盘块。\n");
+    printf("No free disk block\n");
     return -1; // 无可用块
 }
 
 // 释放一个已占用的块
 int free_allocated_block(int block_num) {
     if (block_num < DATA_START) {
-        printf("关键系统块无法被释放。\n");
+        printf("Important system block can't be free\n");
         return 0;
     }
 
     FILE* fp = fopen(DEV_NAME, "rb+");
     if (!fp) {
-        perror("打开磁盘文件失败");
+        perror("Open disk failed");
         return 0;
     }
 
@@ -156,7 +159,7 @@ int free_allocated_block(int block_num) {
     char* empty_block = (char*)calloc(BLOCK_SIZE, sizeof(char)); // 用于清空数据块
 
     if (!bitmap || !empty_block) {
-        perror("内存分配失败");
+        perror("Fail to allocate memory");
         fclose(fp);
         free(bitmap);
         free(empty_block);
@@ -204,7 +207,7 @@ int find_free_inode() {
 int get_inode(int inode_num, iNode* inode) {
     FILE* fp = fopen(DEV_NAME, "rb");
     if (!fp) {
-        perror("get_inode: 无法打开磁盘文件");
+        perror("get_inode: can't open the disk");
         return -1;
     }
     fseek(fp, INODE_START * BLOCK_SIZE + inode_num * sizeof(iNode), SEEK_SET);
@@ -232,7 +235,7 @@ int create_entry(const char* path, int is_dir, int permission) {
 
     // 处理根目录特殊情况
     if (last_slash == path && strlen(path) == 1) {
-        printf("DEBUG: 不能创建根目录\n");
+        printf("DEBUG: can't create the root\n");
         return -1;
     }
 
@@ -272,12 +275,12 @@ int create_entry(const char* path, int is_dir, int permission) {
     //printf("DEBUG: 父目录模式: %d, 大小: %d\n", parent_node.i_mode, parent_node.i_size);
 
     if (parent_node.i_mode != 0) {
-        printf("DEBUG: 父路径不是目录\n");
+        printf("DEBUG: the father is not dir\n");
         return -1;
     }
 
     if (!block_read(parent_node.block_address[0], (char*)&parent_dir)) {
-        printf("DEBUG: 无法读取父目录内容, 块地址: %d\n", parent_node.block_address[0]);
+        printf("DEBUG: can't read the father, block addr: %d\n", parent_node.block_address[0]);
         return -1;
     }
     //printf("DEBUG: 父目录条目数: %d/%d\n", parent_dir.num_entries, DIR_NUM);
@@ -286,7 +289,7 @@ int create_entry(const char* path, int is_dir, int permission) {
     for (int i = 0; i < parent_dir.num_entries; i++) {
         //printf("DEBUG: 检查条目 %d: %s\n", i, parent_dir.entries[i].name);
         if (strncmp(parent_dir.entries[i].name, name, Name_length) == 0) {
-            printf("DEBUG: 名称冲突: %s\n", name);
+            printf("DEBUG: Name conflict: %s\n", name);
             return -1;
         }
     }
@@ -294,7 +297,7 @@ int create_entry(const char* path, int is_dir, int permission) {
     // 分配新inode
     int new_inode = find_free_inode();
     if (new_inode == -1) {
-        printf("DEBUG: iNode耗尽\n");
+        printf("DEBUG: iNode used up\n");
         return -1;
     }
     //printf("DEBUG: 分配的新inode: %d\n", new_inode);
@@ -317,7 +320,7 @@ int create_entry(const char* path, int is_dir, int permission) {
     if (is_dir) {
         int new_block = alloc_first_free_block();
         if (new_block == -1) {
-            printf("DEBUG: 无法分配数据块\n");
+            printf("DEBUG: unable to allocate data block\n");
             return -1;
         }
         //printf("DEBUG: 为目录分配的数据块: %d\n", new_block);
@@ -325,7 +328,7 @@ int create_entry(const char* path, int is_dir, int permission) {
         // 初始化空目录
         directory new_dir = { 0 }; // 条目数设为0
         if (!block_write(new_block, (char*)&new_dir)) {
-            printf("DEBUG: 写入新目录数据失败\n");
+            printf("DEBUG: write failed\n");
             free_allocated_block(new_block);
             return -1;
         }
@@ -351,7 +354,7 @@ int create_entry(const char* path, int is_dir, int permission) {
 
     // 更新父目录
     if (parent_dir.num_entries >= DIR_NUM) {
-        printf("DEBUG: 父目录已满 (最大条目数: %d)\n", DIR_NUM);
+        printf("DEBUG: the father has been full (Maximum number: %d)\n", DIR_NUM);
         if (is_dir && new_node.block_address[0] != 0) {
             free_allocated_block(new_node.block_address[0]);
         }
@@ -412,7 +415,7 @@ int delete_entry(const char* path) {
 
     // 处理根目录特殊情况
     if (strlen(path) == 1 && path[0] == '/') {
-        printf("不能删除根目录\n");
+        printf("Can't delete the root\n");
         return -1;
     }
 
@@ -431,7 +434,7 @@ int delete_entry(const char* path) {
     // 获取父目录inode
     int parent_inode_num;
     if (resolve_path(parent_path, &parent_inode_num) != 0) {
-        printf("父目录不存在: %s\n", parent_path);
+        printf("Father doesn't exist: %s\n", parent_path);
         return -1;
     }
 
@@ -453,7 +456,7 @@ int delete_entry(const char* path) {
     }
 
     if (target_index == -1) {
-        printf("目标不存在: %s\n", name);
+        printf("The target doesn't exist: %s\n", name);
         return -1;
     }
 
@@ -466,7 +469,7 @@ int delete_entry(const char* path) {
         directory target_dir;
         block_read(target_inode.block_address[0], (char*)&target_dir);
         if (target_dir.num_entries > 0) {
-            printf("目录非空，无法删除\n");
+            printf("Non-empty dirs cannot be deleted\n");
             return -1;
         }
     }
@@ -533,7 +536,7 @@ int resolve_path(const char* path, int* inode_num_out) {
 
     // 确保路径以'/'开头
     if (path_copy[0] != '/') {
-        printf("DEBUG: 无效路径: 必须以'/'开头\n");
+        printf("DEBUG: Invalid path: must start with '/'\n");
         return -1;
     }
 
@@ -541,7 +544,7 @@ int resolve_path(const char* path, int* inode_num_out) {
     int current_inode_num = 0;
     iNode current_inode;
     if (get_inode(current_inode_num, &current_inode) < 0) {
-        printf("DEBUG: 获取根目录inode失败\n");
+        printf("DEBUG: Failed to get inode of root\n");
         return -1;
     }
 
@@ -583,14 +586,14 @@ int resolve_path(const char* path, int* inode_num_out) {
 
         // 确保当前节点是目录
         if (current_inode.i_mode != 0) {
-            printf("DEBUG: 错误: inode %d 不是目录\n", current_inode_num);
+            printf("ERROR: inode %d is not a dir\n", current_inode_num);
             return -1;
         }
 
         // 读取目录内容
         directory dir;
         if (!block_read(current_inode.block_address[0], (char*)&dir)) {
-            printf("DEBUG: 无法读取目录内容, inode: %d, 块: %d\n",
+            printf("DEBUG: cannot read the dir, inode: %d, block: %d\n",
                 current_inode_num, current_inode.block_address[0]);
             return -1;
         }
@@ -632,15 +635,15 @@ void dir_ls(int inode_num) {
 
     get_inode(inode_num, &node);
     if (node.i_mode != 0) {
-        printf("错误：inode %d 不是目录\n", inode_num);
+        printf("ERROR：inode %d is not a dir\n", inode_num);
         return;
     }
 
     block_read(node.block_address[0], (char*)&dir);
 
-    printf("\n===== 目录 [inode %d] =====\n", inode_num);
-    printf("类型: %-6s  大小: %-2dB  条目数: %d/%d\n",
-        node.i_mode ? "文件" : "目录",
+    printf("\n===== Dir [inode %d] =====\n", inode_num);
+    printf("Type: %-6s  Size: %-2dB  Number of items: %d/%d\n",
+        node.i_mode ? "File" : "Dir",
         node.i_size,
         dir.num_entries, DIR_NUM);
     printf("--------------------------\n");
@@ -659,16 +662,17 @@ OS_FILE* Open_File(const char* path, int mode) {
     //printf("尝试打开文件: %s\n", path);
 
     if (resolve_path(path, &inode_num) != 0) {
-        printf("文件不存在: %s\n", path);
+        printf("File doesn't exist: %s\n", path);
+        log_write_disk(LOG_ERROR, __FILE__, __LINE__, "Open %s failed, file doesn't exist ", path);
         return NULL;
     }
-
+    log_write_disk(LOG_INFO, __FILE__, __LINE__, "Open file %s", path);
     //printf("文件inode编号: %d\n", inode_num);
 
     // 分配文件句柄内存
     OS_FILE* file = (OS_FILE*)malloc(sizeof(OS_FILE));
     if (!file) {
-        perror("内存分配失败");
+        perror("Fail to allocate memory");
         return NULL;
     }
 
@@ -679,7 +683,7 @@ OS_FILE* Open_File(const char* path, int mode) {
     file->f_iNode = (iNode*)malloc(sizeof(iNode));
     file->f_inode_num = inode_num;
     if (!file->f_iNode) {
-        perror("内存分配失败");
+        perror("Fail to allocate memory");
         free(file);
         return NULL;
     }
@@ -688,13 +692,13 @@ OS_FILE* Open_File(const char* path, int mode) {
     memset(file->f_iNode, 0, sizeof(iNode));
 
     if (get_inode(inode_num, file->f_iNode) < 0) {
-        printf("无法读取iNode %d\n", inode_num);
+        printf("Can't read iNode %d\n", inode_num);
         free(file->f_iNode);
         free(file);
         return NULL;
     }
 
-    if (mode & RDWR) {  
+    if (mode & RDWR) {
         file->f_pos = file->f_iNode->i_size; // 指针指向文件末尾
     }
     else {             // 覆盖模式
@@ -713,7 +717,7 @@ OS_FILE* Open_File(const char* path, int mode) {
         fclose(fp);
     }
     else {
-        perror("无法更新inode信息");
+        perror("Unable to update inode");
         // 继续执行，不返回错误
     }
 
@@ -724,7 +728,7 @@ OS_FILE* Open_File(const char* path, int mode) {
 // 写入文件数据
 int file_write(OS_FILE* f, const char* data, int len) {
     if (!f || !f->f_iNode) {
-        printf("无效的文件句柄\n");
+        printf("Invalid file handle\n");
         return -1;
     }
 
@@ -736,14 +740,14 @@ int file_write(OS_FILE* f, const char* data, int len) {
 
     // 检查是否为目录
     if (f->f_iNode->i_mode == 0) {
-        printf("不能对目录进行写操作\n");
+        printf("Cannot write a dir\n");
         return -1;
     }
 
     // 计算需要写入的总长度
     int total_size = f->f_pos + len;
     if (total_size > MAX_FILE_SIZE) {
-        printf("超出最大文件大小\n");
+        printf("Exceeding the maximum file size\n");
         return -1;
     }
 
@@ -755,7 +759,7 @@ int file_write(OS_FILE* f, const char* data, int len) {
     for (int i = current_blocks; i < needed_blocks && i < FBLK_NUM; i++) {
         int new_block = alloc_first_free_block();
         if (new_block == -1) {
-            printf("磁盘空间不足\n");
+            printf("Disk space is insufficient\n");
             return -1;
         }
         f->f_iNode->block_address[i] = new_block;
@@ -830,7 +834,7 @@ int file_write(OS_FILE* f, const char* data, int len) {
 // 读取文件数据
 int file_read(OS_FILE* f, char* buf, int len) {
     if (!f || !f->f_iNode) {
-        printf("无效的文件句柄\n");
+        printf("Invalid file handle\n");
         return -1;
     }
 
@@ -842,7 +846,7 @@ int file_read(OS_FILE* f, char* buf, int len) {
 
     // 检查是否为目录
     if (f->f_iNode->i_mode == 0) {
-        printf("不能对目录进行读操作\n");
+        printf("Cannot read a dir\n");
         return -1;
     }
 
@@ -890,7 +894,7 @@ int file_read(OS_FILE* f, char* buf, int len) {
 
         // 更新计数
         bytes_read += bytes_to_read;
-        remaining -= bytes_to_read; 
+        remaining -= bytes_to_read;
         f->f_pos += bytes_to_read;
     }
 
@@ -918,4 +922,3 @@ void Close_File(OS_FILE* f) {
     free(f->f_iNode);
     free(f);
 }
-
